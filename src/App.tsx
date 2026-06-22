@@ -7,8 +7,8 @@ import { ProfileMenu } from "@/components/ProfileMenu";
 import { Home, Calendar, WalletCards, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import walletIconPath from "@assets/apple-touch-icon_1782064032522.png";
-import profileIconPath from "@assets/profile_1782064032522.png";
+const walletIconPath = "/favicon.svg";
+const profileIconPath = "/favicon.svg";
 
 type Tab = "home" | "today" | "assets" | "liabilities";
 
@@ -18,10 +18,16 @@ function App() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case "home": return <HomeTab />;
-      case "today": return <TodayTab />;
-      case "assets": return <AssetsTab />;
-      case "liabilities": return <LiabilitiesTab />;
+      case "home":
+        return <HomeTab />;
+      case "today":
+        return <TodayTab />;
+      case "assets":
+        return <AssetsTab />;
+      case "liabilities":
+        return <LiabilitiesTab />;
+      default:
+        return null;
     }
   };
 
@@ -68,7 +74,10 @@ function App() {
 }
 
 function NavButton({ icon, label, isActive, onClick }: {
-  icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
 }) {
   return (
     <button onClick={onClick}
