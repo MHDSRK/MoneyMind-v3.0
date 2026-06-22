@@ -1,6 +1,7 @@
 {
   "name": "moneymind",
   "version": "1.0.0",
+  "packageManager": "pnpm@10.30.3",
   "private": true,
   "type": "module",
   "scripts": {
