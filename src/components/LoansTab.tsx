@@ -26,23 +26,33 @@ export function LoansTab() {
 
     const nextEmiDate = addMonths(new Date(formData.startDate), 1);
 
-    const newLoan: Loan = {
-      id: editingId || crypto.randomUUID(),
-      name: formData.name,
-      lender: formData.lender,
-      principal: formData.principal,
-      interestRate: formData.interestRate,
-      emiAmount: formData.emiAmount,
-      emiFrequency: formData.emiFrequency,
-      emiCount: formData.emiCount,
-      paidCount: editingId ? (store.loans.find((l) => l.id === editingId)?.paidCount ?? 0) : 0,
-      outstanding: formData.principal,
-      startDate: formData.startDate,
-      nextEmiDate: nextEmiDate.toISOString().split("T")[0],
-      createdAt: editingId
-        ? store.loans.find((l) => l.id === editingId)?.createdAt || new Date().toISOString()
-        : new Date().toISOString(),
-    };
+const newLoan: Loan = {
+  id: editingId || crypto.randomUUID(),
+  name: formData.name,
+  lender: formData.lender,
+  principal: formData.principal,
+  interestRate: formData.interestRate,
+
+  emi: formData.emiAmount,
+
+  emiAmount: formData.emiAmount,
+  emiFrequency: formData.emiFrequency,
+  emiCount: formData.emiCount,
+  paidCount: editingId
+    ? (store.loans.find((l) => l.id === editingId)?.paidCount ?? 0)
+    : 0,
+
+  outstanding: formData.principal,
+
+  remainingMonths: formData.emiCount,
+
+  startDate: formData.startDate,
+  nextEmiDate: nextEmiDate.toISOString().split("T")[0],
+
+  createdAt: editingId
+    ? store.loans.find((l) => l.id === editingId)?.createdAt || new Date().toISOString()
+    : new Date().toISOString(),
+};
 
     updateStore((prev) => {
       if (editingId) {
