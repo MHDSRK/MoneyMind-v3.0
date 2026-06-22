@@ -9,11 +9,11 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   category: string;
-  account: string;
+  account?: string;
   fromAccount?: string;
   toAccount?: string;
-  notes?: string;
-  tags?: string[];
+  notes: string;
+  tags: string[];
   deleted?: boolean;
 }
 
@@ -22,13 +22,14 @@ export type AccountType =
   | "bank"
   | "business"
   | "investment"
+  | "investments"
   | "insurance"
   | "other";
 
 export interface Account {
-  id?: string;
+  id: string;
   name: string;
-  type?: AccountType;
+  type: AccountType;
   group?: "accounts" | "credit-cards";
   balance: number;
   deleted?: boolean;
@@ -37,23 +38,32 @@ export interface Account {
 export interface CreditCard {
   id: string;
   name: string;
+  provider: string;
   creditLimit: number;
   outstanding: number;
-  statementDate: string;
-  dueDate: string;
+  statementDate: number;
+  dueDate: number;
+  nextDueDate: string;
+  createdAt: string;
   deleted?: boolean;
 }
 
 export interface Loan {
   id: string;
   name: string;
+  lender: string;
   principal: number;
   interestRate: number;
   emi: number;
+  emiAmount: number;
+  emiCount: number;
+  paidCount: number;
+  emiFrequency: "monthly" | "weekly" | "yearly";
   outstanding: number;
   remainingMonths: number;
   startDate: string;
   nextEmiDate: string;
+  createdAt: string;
   deleted?: boolean;
 }
 
@@ -78,6 +88,7 @@ export interface Category {
   id: string;
   name: string;
   type: TransactionType;
+  deleted?: boolean;
 }
 
 export interface Store {
@@ -104,69 +115,99 @@ const INITIAL_DATA: Store = {
     {
       id: "sbi-octane",
       name: "SBI octane",
+      provider: "SBI",
       creditLimit: 0,
       outstanding: 0,
-      statementDate: "",
-      dueDate: "",
+      statementDate: 1,
+      dueDate: 20,
+      nextDueDate: "",
+      createdAt: new Date().toISOString(),
     },
     {
       id: "hdfc-money-back",
       name: "HDFC Money Back",
+      provider: "HDFC",
       creditLimit: 0,
       outstanding: 0,
-      statementDate: "",
-      dueDate: "",
+      statementDate: 1,
+      dueDate: 20,
+      nextDueDate: "",
+      createdAt: new Date().toISOString(),
     },
     {
       id: "axis-neo",
       name: "AXIS Neo",
+      provider: "AXIS",
       creditLimit: 0,
       outstanding: 0,
-      statementDate: "",
-      dueDate: "",
+      statementDate: 1,
+      dueDate: 20,
+      nextDueDate: "",
+      createdAt: new Date().toISOString(),
     },
     {
       id: "axis-my-zone",
       name: "AXIS My Zone",
+      provider: "AXIS",
       creditLimit: 0,
       outstanding: 0,
-      statementDate: "",
-      dueDate: "",
+      statementDate: 1,
+      dueDate: 20,
+      nextDueDate: "",
+      createdAt: new Date().toISOString(),
     },
   ],
   loans: [
     {
       id: "cred-personal-loan-1",
       name: "Cred Personal Loan 1",
+      lender: "Cred",
       principal: 0,
       interestRate: 0,
       emi: 0,
+      emiAmount: 0,
+      emiCount: 0,
+      paidCount: 0,
+      emiFrequency: "monthly",
       outstanding: 0,
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
+      createdAt: new Date().toISOString(),
     },
     {
       id: "cred-personal-loan-2",
       name: "Cred Personal Loan 2",
+      lender: "Cred",
       principal: 0,
       interestRate: 0,
       emi: 0,
+      emiAmount: 0,
+      emiCount: 0,
+      paidCount: 0,
+      emiFrequency: "monthly",
       outstanding: 0,
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
+      createdAt: new Date().toISOString(),
     },
     {
       id: "bajaj-loan-emi",
       name: "Bajaj Loan EMI",
+      lender: "Bajaj",
       principal: 0,
       interestRate: 0,
       emi: 0,
+      emiAmount: 0,
+      emiCount: 0,
+      paidCount: 0,
+      emiFrequency: "monthly",
       outstanding: 0,
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
+      createdAt: new Date().toISOString(),
     },
   ],
   liabilities: [
@@ -189,7 +230,6 @@ const INITIAL_DATA: Store = {
     { id: "borrow", name: "Borrow", type: "in" },
     { id: "repayment-in", name: "Repayment", type: "in" },
     { id: "company-in", name: "Company", type: "in" },
-
     { id: "home-expenses", name: "Home Expenses", type: "out" },
     { id: "lent", name: "Lent", type: "out" },
     { id: "repayment-out", name: "Repayment", type: "out" },
@@ -212,11 +252,28 @@ interface StoreContextValue {
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
+function normalizeTransaction(transaction: Partial<Transaction>): Transaction {
+  return {
+    id: transaction.id ?? crypto.randomUUID(),
+    date: transaction.date ?? new Date().toISOString(),
+    ledger: transaction.ledger ?? "",
+    amount: transaction.amount ?? 0,
+    type: transaction.type ?? "out",
+    category: transaction.category ?? "",
+    account: transaction.account ?? transaction.fromAccount ?? transaction.toAccount ?? "",
+    fromAccount: transaction.fromAccount,
+    toAccount: transaction.toAccount,
+    notes: transaction.notes ?? "",
+    tags: transaction.tags ?? [],
+    deleted: transaction.deleted ?? false,
+  };
+}
+
 function normalizeStore(parsed: Partial<Store>): Store {
   return {
     ...INITIAL_DATA,
     ...parsed,
-    transactions: parsed.transactions ?? [],
+    transactions: (parsed.transactions ?? []).map(normalizeTransaction),
     accounts: parsed.accounts ?? INITIAL_DATA.accounts,
     creditCards: parsed.creditCards ?? INITIAL_DATA.creditCards,
     loans: parsed.loans ?? INITIAL_DATA.loans,
