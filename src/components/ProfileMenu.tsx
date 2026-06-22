@@ -172,7 +172,16 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
     if (!newName.trim()) return;
     updateStore((prev) => ({
       ...prev,
-      accounts: [...prev.accounts, { name: newName.trim(), group: groupKey, balance: 0 }],
+     accounts: [
+  ...prev.accounts,
+  {
+    id: crypto.randomUUID(),
+    name: newName.trim(),
+    type: groupKey === "accounts" ? "other" : "other",
+    group: groupKey,
+    balance: 0,
+  },
+],
     }));
     setNewName(""); setIsAdding(false);
   };
