@@ -27,9 +27,9 @@ export type AccountType =
   | "other";
 
 export interface Account {
-  id: string;
+  id?: string;
   name: string;
-  type: AccountType;
+  type?: AccountType;
   group?: "accounts" | "credit-cards";
   balance: number;
   deleted?: boolean;
@@ -39,6 +39,7 @@ export interface CreditCard {
   id: string;
   name: string;
   provider: string;
+  cardNumber?: string;
   creditLimit: number;
   outstanding: number;
   statementDate: number;
@@ -54,13 +55,13 @@ export interface Loan {
   lender: string;
   principal: number;
   interestRate: number;
-  emi: number;
+  emi?: number;
   emiAmount: number;
   emiCount: number;
   paidCount: number;
   emiFrequency: "monthly" | "weekly" | "yearly";
   outstanding: number;
-  remainingMonths: number;
+  remainingMonths?: number;
   startDate: string;
   nextEmiDate: string;
   createdAt: string;
