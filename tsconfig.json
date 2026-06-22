@@ -15,12 +15,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["node", "vite/client"],
-   "ignoreDeprecations": "6.0",
-   "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+"types": ["node", "vite/client"],
+"paths": {
+  "@/*": ["./src/*"]
+}
   },
   "include": ["src"],
   "references": []
