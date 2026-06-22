@@ -22,21 +22,27 @@ export function CreditCardsTab() {
   const handleSave = () => {
     if (!formData.name || !formData.provider || formData.creditLimit <= 0) return;
 
-    const newCard: CreditCard = {
-      id: editingId || crypto.randomUUID(),
-      name: formData.name,
-      provider: formData.provider,
-      cardNumber: formData.cardNumber,
-      creditLimit: formData.creditLimit,
-      outstanding: editingId
-        ? (store.creditCards.find((c) => c.id === editingId)?.outstanding ?? 0)
-        : 0,
-      statementDate: formData.statementDate,
-      dueDate: formData.dueDate,
-      createdAt: editingId
-        ? store.creditCards.find((c) => c.id === editingId)?.createdAt || new Date().toISOString()
-        : new Date().toISOString(),
-    };
+   const newCard: CreditCard = {
+  id: editingId || crypto.randomUUID(),
+  name: formData.name,
+  provider: formData.provider,
+  cardNumber: formData.cardNumber,
+  creditLimit: formData.creditLimit,
+  outstanding: editingId
+    ? (store.creditCards.find((c) => c.id === editingId)?.outstanding ?? 0)
+    : 0,
+  statementDate: formData.statementDate,
+  dueDate: formData.dueDate,
+
+  // 👇 Add this line
+  nextDueDate: editingId
+    ? (store.creditCards.find((c) => c.id === editingId)?.nextDueDate ?? "")
+    : "",
+
+  createdAt: editingId
+    ? (store.creditCards.find((c) => c.id === editingId)?.createdAt || new Date().toISOString())
+    : new Date().toISOString(),
+};
 
     updateStore((prev) => {
       if (editingId) {
