@@ -4,7 +4,7 @@ import { format } from "date-fns";
 
 export function TodayTab() {
   const { store } = useStore();
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = format(new Date(), "yyyy-MM-dd");
   const todaysTx = store.transactions.filter((t) => t.date.startsWith(todayStr));
 
   const todayIn = todaysTx.filter((t) => t.type === "in").reduce((sum, t) => sum + t.amount, 0);
@@ -36,7 +36,9 @@ export function TodayTab() {
               <div key={tx.id} className="flex items-center px-4 py-3">
                 <div className="flex-1 flex flex-col min-w-0 pr-2">
                   <span className="font-medium text-sm truncate">{tx.ledger}</span>
-                  <span className="text-xs text-muted-foreground truncate">{tx.account}</span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {tx.type === "in" ? tx.toAccount : tx.fromAccount || tx.ledger}
+                  </span>
                 </div>
                 <div className="w-24 text-right text-[#34d399] font-medium text-sm">
                   {tx.type === "in" ? formatCurrency(tx.amount) : ""}
@@ -57,10 +59,10 @@ export function TodayTab() {
         </div>
       </div>
 
-      {/* Net Liquidity */}
+      {/* Today's Net */}
       <div className="glass-card p-6 flex flex-col items-center text-center">
         <span className="text-muted-foreground text-xs font-bold tracking-wider mb-2">
-          NET LIQUIDITY
+          TODAY'S NET
         </span>
         <h3
           className={cn(

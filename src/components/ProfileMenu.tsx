@@ -21,6 +21,7 @@ function buildAndDownload(
   transactions: ReturnType<typeof useStore>["store"]["transactions"],
   liabilities: ReturnType<typeof useStore>["store"]["liabilities"],
   lends: ReturnType<typeof useStore>["store"]["lends"],
+  accounts: ReturnType<typeof useStore>["store"]["accounts"],
   label: string
 ) {
   const wb = XLSX.utils.book_new();
@@ -37,7 +38,16 @@ function buildAndDownload(
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows), "Transactions");
 
-  // Sheet 2: Liabilities (all, including deleted)
+  // Sheet 2: Accounts
+  const acctRows = accounts.map((a) => ({
+    Group: a.group === "accounts" ? "Bank/Cash" : "Credit Card",
+    Name: a.name,
+    "Balance (₹)": a.balance,
+    Status: a.deleted ? "Deleted" : "Active",
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(acctRows), "Accounts");
+
+  // Sheet 3: Liabilities (all, including deleted)
   const liabRows = liabilities.map((l) => ({
     Group: l.group,
     Name: l.name,
@@ -47,7 +57,7 @@ function buildAndDownload(
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(liabRows), "Liabilities");
 
-  // Sheet 3: Lends (all, including deleted)
+  // Sheet 4: Lends (all, including deleted)
   const lendRows = lends.map((l) => ({
     Name: l.name,
     "Amount (₹)": l.amount,
@@ -97,6 +107,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   // Section expansion
   const [exportOpen, setExportOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
 
   // Group detail screen
   const [groupScreen, setGroupScreen] = useState<GroupScreen | null>(null);
@@ -119,6 +130,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       setGroupScreen(null);
       setExportOpen(false);
       setEditOpen(false);
+      setBackupOpen(false);
       setConfirmId(null);
       setIsAdding(false);
       setNewName("");
@@ -177,7 +189,47 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   // ── Export handler ──────────────────────────────────────────────────────
   const handleExport = (period: string, label: string) => {
     const filtered = filterTx(store.transactions, period, customStart, customEnd);
-    buildAndDownload(filtered, store.liabilities, store.lends, label);
+    buildAndDownload(filtered, store.liabilities, store.lends, store.accounts, label);
+  };
+
+  // ── Backup/Restore handlers ──────────────────────────────────────────────
+  const handleBackup = () => {
+    const backup = JSON.stringify(store, null, 2);
+    const blob = new Blob([backup], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `MoneyMind_Backup_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRestore = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const backup = JSON.parse(event.target?.result as string);
+          const confirmed = window.confirm(
+            "⚠️ This will replace all current data with the backup. Are you sure?"
+          );
+          if (confirmed) {
+            updateStore(() => backup);
+            alert("✓ Backup restored successfully!");
+          }
+        } catch (err) {
+          alert("❌ Invalid backup file");
+          console.error(err);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   };
 
   if (!open) return null;
@@ -388,6 +440,39 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
                   </div>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── BACKUP section ──────────────────────────────────────────── */}
+        <div>
+          <button
+            onClick={() => setBackupOpen((o) => !o)}
+            className="w-full flex items-center justify-between py-4 border-b border-white/5"
+          >
+            <div className="flex items-center gap-3">
+              <Download className="w-4 h-4 text-primary" />
+              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Backup</span>
+            </div>
+            {backupOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          </button>
+
+          {backupOpen && (
+            <div className="py-2 space-y-0.5 pl-7">
+              <button
+                onClick={handleBackup}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
+              >
+                Export Backup
+                <Download className="w-3.5 h-3.5 text-primary opacity-60" />
+              </button>
+              <button
+                onClick={handleRestore}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
+              >
+                Import Backup
+                <ChevronRight className="w-3.5 h-3.5 text-primary opacity-60" />
+              </button>
             </div>
           )}
         </div>
