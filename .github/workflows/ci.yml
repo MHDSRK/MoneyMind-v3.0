@@ -1,109 +1,77 @@
-```yaml
 name: CI
 
 on:
-  push:
-    branches: [main, master, develop]
-  pull_request:
-    branches: [main, master, develop]
+push:
+branches: [main, master, develop]
+pull_request:
+branches: [main, master, develop]
 
 permissions:
-  contents: read
+contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+group: ci-${{ github.ref }}
+cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: TypeScript Type Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+typecheck:
+runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v5
+```
+steps:
+  - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          package-manager-cache: false
+  - uses: actions/setup-node@v5
+    with:
+      node-version: 22
 
-      - name: Enable Corepack
-        run: corepack enable
+  - uses: pnpm/action-setup@v4
+    with:
+      version: 10.30.3
 
-      - name: Activate pnpm
-        run: |
-          corepack prepare pnpm@10.30.3 --activate
-          pnpm --version
+  - run: pnpm --version
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --no-optional
+  - run: pnpm install --frozen-lockfile
 
-      - name: Type check
-        run: pnpm typecheck
+  - run: pnpm typecheck
+```
 
-  build:
-    name: Production Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+build:
+runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v5
+```
+steps:
+  - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          package-manager-cache: false
+  - uses: actions/setup-node@v5
+    with:
+      node-version: 22
 
-      - name: Enable Corepack
-        run: corepack enable
+  - uses: pnpm/action-setup@v4
+    with:
+      version: 10.30.3
 
-      - name: Activate pnpm
-        run: |
-          corepack prepare pnpm@10.30.3 --activate
-          pnpm --version
+  - run: pnpm install --frozen-lockfile
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --no-optional
+  - run: pnpm build
+```
 
-      - name: Build
-        run: pnpm build
+test:
+runs-on: ubuntu-latest
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: build
-          path: dist/
-          retention-days: 1
+```
+steps:
+  - uses: actions/checkout@v5
 
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  - uses: actions/setup-node@v5
+    with:
+      node-version: 22
 
-    steps:
-      - uses: actions/checkout@v5
+  - uses: pnpm/action-setup@v4
+    with:
+      version: 10.30.3
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          package-manager-cache: false
+  - run: pnpm install --frozen-lockfile
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Activate pnpm
-        run: |
-          corepack prepare pnpm@10.30.3 --activate
-          pnpm --version
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --no-optional
-
-      - name: Run tests
-        run: pnpm test -- --run
-
-      - name: Generate coverage report
-        run: pnpm test:coverage -- --run
-        continue-on-error: true
+  - run: pnpm test -- --run
 ```
