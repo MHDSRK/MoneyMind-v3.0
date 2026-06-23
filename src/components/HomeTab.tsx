@@ -396,6 +396,15 @@ export function HomeTab() {
                   </div>
                 )}
 
+                {txType === "out" && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
+                      Select Account or Card
+                    </label>
+                    {moneyOutSelect}
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
                     Ledger / Name
@@ -408,15 +417,6 @@ export function HomeTab() {
                     className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-primary transition-all text-sm"
                   />
                 </div>
-
-                {txType === "out" && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
-                      Select Account or Card
-                    </label>
-                    {moneyOutSelect}
-                  </div>
-                )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">

@@ -42,6 +42,7 @@ export interface CreditCard {
   cardNumber?: string;
   creditLimit: number;
   outstanding: number;
+  unbilled?: number;
   statementDate: number;
   dueDate: number;
   nextDueDate: string;

@@ -125,7 +125,7 @@ export function AssetsTab() {
         ))}
       </GroupSection>
 
-      <GroupSection label="Other Assets" total={otherTotal}>
+      <GroupSection label="Lent (Don't add in total)" total={otherTotal}>
         {otherAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />

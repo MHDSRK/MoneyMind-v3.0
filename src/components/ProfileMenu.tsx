@@ -433,7 +433,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           )}
         </div>
 
-        {/* ── EDIT section ────────────────────────────────────────────── */}
+        {/* ── EDIT AND ADD section ────────────────────────────────────────────── */}
         <div>
           <button
             onClick={() => setEditOpen((o) => !o)}
@@ -441,7 +441,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           >
             <div className="flex items-center gap-3">
               <Pencil className="w-4 h-4 text-primary" />
-              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Edit</span>
+              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Edit & Add</span>
             </div>
             {editOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           </button>
@@ -461,7 +461,14 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
                 </button>
               ))}
 
-
+              {/* Loans sub-header */}
+              <p className="text-[10px] uppercase tracking-widest text-primary font-bold pt-2 pb-1 px-3 neon-text">Loans</p>
+              <button
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
+              >
+                Manage Loans
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
           )}
         </div>

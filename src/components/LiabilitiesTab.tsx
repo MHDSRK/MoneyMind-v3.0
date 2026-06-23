@@ -67,15 +67,7 @@ export function LiabilitiesTab() {
     <div className="pb-32 px-4 pt-24 space-y-4">
       <h2 className="text-2xl font-bold text-foreground mb-2">Liabilities</h2>
 
-      <Section label="Credit Cards" total={creditCardTotal}>
-        {visibleCreditCards.length === 0 ? (
-          <p className="text-muted-foreground text-xs py-3 text-center italic">No credit cards</p>
-        ) : (
-          visibleCreditCards.map((card) => <CreditCardRow key={card.id} card={card} onUpdate={() => {}} />)
-        )}
-      </Section>
-
-      <Section label="Loans" total={loanTotal}>
+      <Section label="Borrow" total={loanTotal}>
         {visibleLoans.length === 0 ? (
           <p className="text-muted-foreground text-xs py-3 text-center italic">No loans</p>
         ) : (
@@ -95,6 +87,14 @@ export function LiabilitiesTab() {
               </div>
             </div>
           ))
+        )}
+      </Section>
+
+      <Section label="Other Liabilities" total={creditCardTotal}>
+        {visibleCreditCards.length === 0 ? (
+          <p className="text-muted-foreground text-xs py-3 text-center italic">No credit cards</p>
+        ) : (
+          visibleCreditCards.map((card) => <CreditCardRow key={card.id} card={card} onUpdate={() => {}} />)
         )}
       </Section>
     </div>

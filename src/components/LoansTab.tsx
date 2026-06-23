@@ -132,20 +132,7 @@ const newLoan: Loan = {
                   <p className="font-bold text-foreground">{loan.name}</p>
                   <p className="text-xs text-muted-foreground">{loan.lender}</p>
                 </div>
-                <button
-                  onClick={() => handleDelete(loan.id)}
-                  className={`p-1 rounded-lg transition-all ${
-                    confirmDelete === loan.id
-                      ? "bg-destructive text-white animate-pulse"
-                      : "text-destructive hover:bg-destructive/10"
-                  }`}
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
-              {confirmDelete === loan.id && (
-                <p className="text-[10px] text-muted-foreground text-center py-2">Tap delete again to confirm</p>
-              )}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-muted-foreground">Outstanding</span>
