@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useStore } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import * as backupService from "@/lib/backupService";
+import * as googleDriveService from "@/lib/googleDriveService";
 import {
   X, ChevronDown, ChevronRight, ChevronLeft,
-  Download, Pencil, Trash2, Plus, Check
+  Download, Pencil, Trash2, Plus, Check, Cloud
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, parseISO, startOfMonth, subMonths } from "date-fns";
@@ -112,6 +113,12 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   const [backups, setBackups] = useState(() => backupService.getBackupsMetadata());
   const [lastAutoBackupTime, setLastAutoBackupTime] = useState(() => backupService.getLastAutoBackupTime());
   const [backupsListOpen, setBackupsListOpen] = useState(false);
+
+  // Google Drive state
+  const [googleDriveConnected, setGoogleDriveConnected] = useState(googleDriveService.isGoogleDriveConnected());
+  const [googleDriveOpen, setGoogleDriveOpen] = useState(false);
+  const [googleDriveBackups, setGoogleDriveBackups] = useState<googleDriveService.GoogleDriveBackup[]>([]);
+  const [googleDriveLoading, setGoogleDriveLoading] = useState(false);
 
   // Group detail screen
   const [groupScreen, setGroupScreen] = useState<GroupScreen | null>(null);
@@ -257,6 +264,104 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       reader.readAsText(file);
     };
     input.click();
+  };
+
+  // Google Drive handlers
+  const handleGoogleDriveConnect = () => {
+    googleDriveService.initiateGoogleAuth();
+  };
+
+  const handleGoogleDriveDisconnect = () => {
+    if (window.confirm("⚠️ Disconnect from Google Drive? You'll need to reconnect to sync again.")) {
+      googleDriveService.disconnectGoogleDrive();
+      setGoogleDriveConnected(false);
+      setGoogleDriveBackups([]);
+      alert("✓ Disconnected from Google Drive");
+    }
+  };
+
+  const handleUploadToGoogleDrive = async () => {
+    if (!googleDriveConnected) {
+      alert("❌ Not connected to Google Drive");
+      return;
+    }
+    try {
+      setGoogleDriveLoading(true);
+      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const fileName = `MoneyMind_Backup_${timestamp}.json`;
+      const backup = await googleDriveService.uploadBackupToGoogleDrive(store, fileName);
+      alert(`✓ Backup uploaded to Google Drive!\n${backup.name}\n${backup.size} bytes`);
+      await handleListGoogleDriveBackups();
+    } catch (err) {
+      alert(`❌ Upload failed: ${err}`);
+    } finally {
+      setGoogleDriveLoading(false);
+    }
+  };
+
+  const handleListGoogleDriveBackups = async () => {
+    if (!googleDriveConnected) {
+      alert("❌ Not connected to Google Drive");
+      return;
+    }
+    try {
+      setGoogleDriveLoading(true);
+      const backups = await googleDriveService.listGoogleDriveBackups();
+      setGoogleDriveBackups(backups);
+      setGoogleDriveOpen(true);
+    } catch (err) {
+      alert(`❌ Failed to list backups: ${err}`);
+    } finally {
+      setGoogleDriveLoading(false);
+    }
+  };
+
+  const handleDownloadFromGoogleDrive = async (fileId: string, fileName: string) => {
+    try {
+      setGoogleDriveLoading(true);
+      const data = await googleDriveService.downloadFromGoogleDrive(fileId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      alert("✓ Backup downloaded!");
+    } catch (err) {
+      alert(`❌ Download failed: ${err}`);
+    } finally {
+      setGoogleDriveLoading(false);
+    }
+  };
+
+  const handleRestoreFromGoogleDrive = async (fileId: string) => {
+    if (!window.confirm("⚠️ This will replace all current data. Are you sure?")) return;
+    try {
+      setGoogleDriveLoading(true);
+      const data = await googleDriveService.downloadFromGoogleDrive(fileId);
+      updateStore(() => data);
+      alert("✓ Data restored from Google Drive!");
+      setGoogleDriveOpen(false);
+    } catch (err) {
+      alert(`❌ Restore failed: ${err}`);
+    } finally {
+      setGoogleDriveLoading(false);
+    }
+  };
+
+  const handleDeleteFromGoogleDrive = async (fileId: string) => {
+    if (!window.confirm("⚠️ Delete this backup from Google Drive permanently?")) return;
+    try {
+      setGoogleDriveLoading(true);
+      await googleDriveService.deleteFromGoogleDrive(fileId);
+      alert("✓ Backup deleted");
+      await handleListGoogleDriveBackups();
+    } catch (err) {
+      alert(`❌ Delete failed: ${err}`);
+    } finally {
+      setGoogleDriveLoading(false);
+    }
   };
 
   if (!open) return null;
@@ -546,6 +651,108 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
                 Import Backup File
                 <ChevronRight className="w-3.5 h-3.5 text-primary opacity-60" />
               </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── GOOGLE DRIVE SYNC section ────────────────────────────────────────────── */}
+        <div>
+          <button
+            onClick={() => setGoogleDriveOpen((o) => !o)}
+            className="w-full flex items-center justify-between py-4 border-b border-white/5"
+          >
+            <div className="flex items-center gap-3">
+              <Cloud className="w-4 h-4 text-primary" />
+              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Google Drive Sync</span>
+            </div>
+            {googleDriveOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          </button>
+
+          {googleDriveOpen && (
+            <div className="py-2 space-y-0.5 pl-7">
+              {/* Connection status */}
+              <div className="py-3 px-3 rounded-xl bg-white/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-foreground">Connection Status</span>
+                  <button
+                    onClick={googleDriveConnected ? handleGoogleDriveDisconnect : handleGoogleDriveConnect}
+                    disabled={googleDriveLoading}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      googleDriveConnected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-white/10 text-muted-foreground hover:bg-white/20"
+                    } disabled:opacity-50`}
+                  >
+                    {googleDriveLoading ? "..." : googleDriveConnected ? "Connected" : "Connect"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {googleDriveConnected
+                    ? "✓ Connected to Google Drive"
+                    : "Not connected. Click 'Connect' to enable cloud sync"}
+                </p>
+              </div>
+
+              {/* Upload to Google Drive */}
+              {googleDriveConnected && (
+                <>
+                  <button
+                    onClick={handleUploadToGoogleDrive}
+                    disabled={googleDriveLoading}
+                    className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between disabled:opacity-50"
+                  >
+                    Upload Now
+                    <Cloud className="w-3.5 h-3.5 text-primary opacity-60" />
+                  </button>
+
+                  {/* View Google Drive backups */}
+                  <button
+                    onClick={handleListGoogleDriveBackups}
+                    disabled={googleDriveLoading}
+                    className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between disabled:opacity-50"
+                  >
+                    View Backups ({googleDriveBackups.length})
+                    <ChevronRight className="w-3.5 h-3.5 text-primary opacity-60" />
+                  </button>
+
+                  {/* Google Drive backups list */}
+                  {googleDriveBackups.length > 0 && (
+                    <div className="mt-2 ml-3 space-y-1 max-h-72 overflow-y-auto">
+                      {googleDriveBackups.map((backup, idx) => (
+                        <div key={backup.id} className="py-2 px-3 rounded-lg bg-black/20 border border-white/5 space-y-1">
+                          <p className="text-xs font-mono text-muted-foreground">{backup.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {format(parseISO(backup.modifiedTime), "MMM d, yyyy HH:mm")}
+                          </p>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => handleRestoreFromGoogleDrive(backup.id)}
+                              disabled={googleDriveLoading}
+                              className="flex-1 text-center py-1.5 px-2 rounded-lg bg-primary/20 text-primary text-[10px] font-bold hover:bg-primary/30 transition-all disabled:opacity-50"
+                            >
+                              Restore
+                            </button>
+                            <button
+                              onClick={() => handleDownloadFromGoogleDrive(backup.id, backup.name)}
+                              disabled={googleDriveLoading}
+                              className="flex-1 text-center py-1.5 px-2 rounded-lg bg-white/10 text-muted-foreground text-[10px] font-bold hover:bg-white/20 transition-all disabled:opacity-50"
+                            >
+                              Download
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFromGoogleDrive(backup.id)}
+                              disabled={googleDriveLoading}
+                              className="flex-1 text-center py-1.5 px-2 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-bold hover:bg-red-500/20 transition-all disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
