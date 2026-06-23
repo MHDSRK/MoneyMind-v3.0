@@ -11,16 +11,15 @@ jobs:
     name: TypeScript Type Check
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
           version: 10.30.3
 
-      - uses: actions/setup-node@v4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -32,16 +31,15 @@ jobs:
     name: Production Build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
           version: 10.30.3
 
-      - uses: actions/setup-node@v4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -60,16 +58,15 @@ jobs:
     name: Tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
           version: 10.30.3
 
-      - uses: actions/setup-node@v4.1.0
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -86,16 +83,15 @@ jobs:
   #   name: Linting
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v4.1.7
+  #     - uses: actions/checkout@v4
   #
   #     - uses: pnpm/action-setup@v4
   #       with:
   #         version: 10.30.3
   #
-  #     - uses: actions/setup-node@v4.1.0
+  #     - uses: actions/setup-node@v4
   #       with:
   #         node-version: "22"
-  #         cache: "pnpm"
   #
   #     - name: Install dependencies
   #       run: pnpm install --frozen-lockfile
