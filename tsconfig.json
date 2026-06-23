@@ -21,6 +21,6 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/**/__tests__", "node_modules"],
+  "exclude": ["src/**/__tests__/**", "node_modules"],
   "references": []
 }
