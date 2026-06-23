@@ -17,8 +17,10 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Enable pnpm via corepack
-        run: corepack enable pnpm
+      - name: Install pnpm globally
+        run: |
+          npm install -g pnpm@10.30.3
+          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -36,8 +38,10 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Enable pnpm via corepack
-        run: corepack enable pnpm
+      - name: Install pnpm globally
+        run: |
+          npm install -g pnpm@10.30.3
+          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -62,8 +66,10 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Enable pnpm via corepack
-        run: corepack enable pnpm
+      - name: Install pnpm globally
+        run: |
+          npm install -g pnpm@10.30.3
+          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
