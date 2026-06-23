@@ -162,7 +162,7 @@ export function LiabilitiesTab() {
   const { store, updateStore } = useStore();
 
   // Define the order and list of all groups to display
-  const GROUPS = ["Chitty", "Regular Expenses", "Borrow", "Others"];
+  const GROUPS = ["Regular Expenses", "Chitty", "Borrow", "Others"];
 
   const handleLiabilityUpdate = (id: string, newAmount: number) => {
     updateStore((prev) => ({
