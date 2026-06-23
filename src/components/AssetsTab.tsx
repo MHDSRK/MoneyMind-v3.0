@@ -92,10 +92,16 @@ export function AssetsTab() {
   const investmentTotal = investmentAccounts.reduce((sum, a) => sum + a.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, a) => sum + a.balance, 0);
   const otherTotal = otherAccounts.reduce((sum, a) => sum + a.balance, 0);
+  const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal + otherTotal;
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
-      <h2 className="text-2xl font-bold text-foreground mb-2">Assets</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-2xl font-bold text-foreground">Assets</h2>
+        <div className={`text-2xl font-bold ${ totalAssets < 0 ? 'text-destructive' : 'text-primary neon-text'}`}>
+          {formatCurrency(totalAssets)}
+        </div>
+      </div>
 
       <GroupSection label="Bank & Cash" total={bankTotal}>
         {bankAccounts.map((acc) => (

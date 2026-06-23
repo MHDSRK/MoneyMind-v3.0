@@ -71,7 +71,7 @@ function App() {
             isActive={activeTab === "credit-cards"} onClick={() => setActiveTab("credit-cards")} />
           <NavButton icon={<Landmark className="w-5 h-5" />} label="Loans"
             isActive={activeTab === "loans"} onClick={() => setActiveTab("loans")} />
-          <NavButton icon={<CreditCard className="w-5 h-6" />} label="Liabilities"
+          <NavButton icon={<CreditCard className="w-5 h-6" />} label="Others"
             isActive={activeTab === "liabilities"} onClick={() => setActiveTab("liabilities")} />
         </div>
       </nav>

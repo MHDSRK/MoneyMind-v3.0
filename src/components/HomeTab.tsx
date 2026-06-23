@@ -117,17 +117,27 @@ export function HomeTab() {
         }
       }
 
-      // Update credit card outstanding if transaction is on a credit card
+      // Update credit card outstanding/unbilled if transaction is on a credit card
       if (txType === "out") {
         const creditCard = next.creditCards.find(
           (cc) => cc.name === source && !cc.deleted
         );
         if (creditCard) {
+          // Determine if this should go to unbilled or outstanding
+          const today = new Date();
+          const currentDate = today.getDate();
+          const statementDate = creditCard.statementDate || 1;
+          const isUnbilled = currentDate >= statementDate;
+          
           next = {
             ...next,
             creditCards: next.creditCards.map((cc) =>
               cc.id === creditCard.id
-                ? { ...cc, outstanding: cc.outstanding + amt }
+                ? {
+                    ...cc,
+                    outstanding: cc.outstanding + (isUnbilled ? 0 : amt),
+                    unbilled: (cc.unbilled || 0) + (isUnbilled ? amt : 0),
+                  }
                 : cc
             ),
           };

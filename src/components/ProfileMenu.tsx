@@ -11,7 +11,7 @@ import * as XLSX from "xlsx";
 import { format, parseISO, startOfMonth, subMonths } from "date-fns";
 
 type GroupScreen =
-  | { type: "asset"; groupKey: "accounts" | "credit-cards"; label: string };
+  | { type: "asset"; groupKey: "accounts" | "credit-cards" | "loans" | "liabilities"; label: string };
 
 // ── Excel export ────────────────────────────────────────────────────────────
 function buildAndDownload(
@@ -135,6 +135,10 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
 
+  // Edit item
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<any>(null);
+
   // Reset inner state when menu closes
   useEffect(() => {
     if (!open) {
@@ -146,6 +150,8 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       setIsAdding(false);
       setNewName("");
       setCustomOpen(false);
+      setEditingItemId(null);
+      setEditFormData(null);
     }
   }, [open]);
 
@@ -164,21 +170,144 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
     }
   };
 
+  const handleDeleteCreditCard = (id: string) => {
+    if (confirmId === `cc-${id}`) {
+      updateStore((prev) => ({
+        ...prev,
+        creditCards: prev.creditCards.map((c) =>
+          c.id === id ? { ...c, deleted: true } : c
+        ),
+      }));
+      setConfirmId(null);
+    } else {
+      setConfirmId(`cc-${id}`);
+    }
+  };
+
+  const handleDeleteLoan = (id: string) => {
+    if (confirmId === `loan-${id}`) {
+      updateStore((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === id ? { ...l, deleted: true } : l
+        ),
+      }));
+      setConfirmId(null);
+    } else {
+      setConfirmId(`loan-${id}`);
+    }
+  };
+
+  // ── Edit helpers ────────────────────────────────────────────────────────
+  const handleStartEdit = (item: any, groupKey: string) => {
+    setEditingItemId(`${groupKey}-${item.id}`);
+    const itemCopy = JSON.parse(JSON.stringify(item));
+    
+    // Ensure credit card fields have default values
+    if (groupKey === "credit-cards") {
+      itemCopy.cardType = itemCopy.cardType || "";
+      itemCopy.statementDate = itemCopy.statementDate || 1;
+      itemCopy.dueDate = itemCopy.dueDate || 15;
+    }
+    
+    setEditFormData(itemCopy);
+  };
+
+  const handleSaveEdit = (groupKey: string) => {
+    if (!editFormData) return;
+    if (groupKey === "accounts") {
+      if (!editFormData.name.trim()) return;
+      updateStore((prev) => ({
+        ...prev,
+        accounts: prev.accounts.map((a) =>
+          a.id === editFormData.id ? editFormData : a
+        ),
+      }));
+    } else if (groupKey === "credit-cards") {
+      if (!editFormData.name.trim()) return;
+      updateStore((prev) => ({
+        ...prev,
+        creditCards: prev.creditCards.map((c) =>
+          c.id === editFormData.id ? editFormData : c
+        ),
+      }));
+    } else if (groupKey === "loans") {
+      if (!editFormData.name.trim()) return;
+      updateStore((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === editFormData.id ? editFormData : l
+        ),
+      }));
+    }
+    setEditingItemId(null);
+    setEditFormData(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditFormData(null);
+  };
+
   // ── Add helpers ─────────────────────────────────────────────────────────
-  const handleAddAccount = (groupKey: "accounts" | "credit-cards") => {
+  const handleAddAccount = (groupKey: "accounts" | "credit-cards" | "loans" | "liabilities") => {
     if (!newName.trim()) return;
-    updateStore((prev) => ({
-      ...prev,
-      accounts: [
-        ...prev.accounts,
-        {
-          id: crypto.randomUUID(),
-          name: newName.trim(),
-          type: "other",
-          balance: 0,
-        },
-      ],
-    }));
+    if (groupKey === "accounts") {
+      updateStore((prev) => ({
+        ...prev,
+        accounts: [
+          ...prev.accounts,
+          {
+            id: crypto.randomUUID(),
+            name: newName.trim(),
+            type: "other",
+            balance: 0,
+          },
+        ],
+      }));
+    } else if (groupKey === "credit-cards") {
+      updateStore((prev) => ({
+        ...prev,
+        creditCards: [
+          ...prev.creditCards,
+          {
+            id: crypto.randomUUID(),
+            name: newName.trim(),
+            provider: "",
+            cardType: "",
+            creditLimit: 0,
+            outstanding: 0,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }));
+    } else if (groupKey === "loans") {
+      updateStore((prev) => ({
+        ...prev,
+        loans: [
+          ...prev.loans,
+          {
+            id: crypto.randomUUID(),
+            name: newName.trim(),
+            lender: "",
+            principal: 0,
+            interestRate: 0,
+            emiAmount: 0,
+            emiCount: 60,
+            paidCount: 0,
+            emiFrequency: "monthly" as const,
+            outstanding: 0,
+            startDate: new Date().toISOString().split("T")[0],
+            nextEmiDate: new Date().toISOString().split("T")[0],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }));
+    }
     setNewName(""); setIsAdding(false);
   };
 
@@ -368,12 +497,229 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
 
   // ── Render: Group Detail Screen ─────────────────────────────────────────
   if (groupScreen) {
-    const items = groupScreen.type === "asset"
-      ? store.accounts.filter((a) => a.id !== undefined && !a.deleted)
-      : [];
+    let items: any[] = [];
+    let deleteFunc: (id: string) => void = () => {};
+    
+    if (groupScreen.groupKey === "accounts") {
+      items = store.accounts.filter((a) => a.id !== undefined && !a.deleted);
+      deleteFunc = handleDeleteAccount;
+    } else if (groupScreen.groupKey === "credit-cards") {
+      items = store.creditCards.filter((c) => c.id !== undefined && !c.deleted);
+      deleteFunc = handleDeleteCreditCard;
+    } else if (groupScreen.groupKey === "loans") {
+      items = store.loans.filter((l) => l.id !== undefined && !l.deleted);
+      deleteFunc = handleDeleteLoan;
+    }
 
     const label = groupScreen.label;
+    const isEditing = editingItemId && editingItemId.startsWith(groupScreen.groupKey);
 
+    // ── EDIT FORM ────────────────────────────────────────────────────
+    if (isEditing && editFormData) {
+      return (
+        <div className="fixed inset-0 z-50 bg-[#090A0F] flex flex-col">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 pt-safe pt-14 pb-4 border-b border-white/10">
+            <button onClick={handleCancelEdit}
+              className="p-1 text-muted-foreground hover:text-white">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-base font-bold text-foreground uppercase tracking-wider">Edit {editFormData.name}</h2>
+          </div>
+
+          {/* Edit Form */}
+          <div className="flex-1 overflow-y-auto px-4 pt-4 pb-32">
+            {groupScreen.groupKey === "accounts" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Type</label>
+                  <select
+                    value={editFormData.type}
+                    onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="savings">Savings</option>
+                    <option value="checking">Checking</option>
+                    <option value="credit">Credit</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Balance (₹)</label>
+                  <input
+                    type="number"
+                    value={editFormData.balance}
+                    onChange={(e) => setEditFormData({ ...editFormData, balance: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            {groupScreen.groupKey === "credit-cards" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Card Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Provider</label>
+                  <input
+                    type="text"
+                    value={editFormData.provider}
+                    onChange={(e) => setEditFormData({ ...editFormData, provider: e.target.value })}
+                    placeholder="e.g., SBI, HDFC, AXIS"
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Card Type</label>
+                  <input
+                    type="text"
+                    value={editFormData.cardType}
+                    onChange={(e) => setEditFormData({ ...editFormData, cardType: e.target.value })}
+                    placeholder="e.g., OCTANE - VISA SIGNATURE"
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Credit Limit (₹)</label>
+                  <input
+                    type="number"
+                    value={editFormData.creditLimit}
+                    onChange={(e) => setEditFormData({ ...editFormData, creditLimit: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Statement Date (Day of month)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={editFormData.statementDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, statementDate: parseInt(e.target.value) || 1 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Due Date (Day of month)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={editFormData.dueDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, dueDate: parseInt(e.target.value) || 15 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            {groupScreen.groupKey === "loans" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Loan Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Lender</label>
+                  <input
+                    type="text"
+                    value={editFormData.lender}
+                    onChange={(e) => setEditFormData({ ...editFormData, lender: e.target.value })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Principal (₹)</label>
+                  <input
+                    type="number"
+                    value={editFormData.principal}
+                    onChange={(e) => setEditFormData({ ...editFormData, principal: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Interest Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editFormData.interestRate}
+                    onChange={(e) => setEditFormData({ ...editFormData, interestRate: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">EMI Amount (₹)</label>
+                  <input
+                    type="number"
+                    value={editFormData.emiAmount}
+                    onChange={(e) => setEditFormData({ ...editFormData, emiAmount: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Total EMI Count</label>
+                  <input
+                    type="number"
+                    value={editFormData.emiCount}
+                    onChange={(e) => setEditFormData({ ...editFormData, emiCount: parseInt(e.target.value) || 60 })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Start Date</label>
+                  <input
+                    type="date"
+                    value={editFormData.startDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                    className="w-full mt-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#090A0F] to-transparent px-4 py-4 flex gap-2 z-50">
+            <button
+              onClick={handleCancelEdit}
+              className="flex-1 px-4 py-3 rounded-xl text-sm font-bold text-muted-foreground border border-white/10 hover:bg-white/5 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSaveEdit(groupScreen.groupKey)}
+              className="flex-1 px-4 py-3 rounded-xl text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 transition-all"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── LIST VIEW ────────────────────────────────────────────────────
     return (
       <div className="fixed inset-0 z-50 bg-[#090A0F] flex flex-col">
         {/* Header */}
@@ -391,29 +737,42 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
             <p className="text-muted-foreground italic text-sm text-center py-8">No items</p>
           )}
           {items.map((item) => {
-            const id = `acc-${item.id}`;
+            const idKey = groupScreen.groupKey === "accounts" ? "acc" : groupScreen.groupKey === "credit-cards" ? "cc" : "loan";
+            const id = `${idKey}-${item.id}`;
             const isConfirming = confirmId === id;
             return (
               <div key={id}
                 className="flex items-center justify-between py-3.5 border-b border-white/5 last:border-0">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{item.name}</p>
-                  <p className="text-xs text-[#34d399]">{formatCurrency(item.balance)}</p>
+                  <p className="text-xs text-[#34d399]">
+                    {groupScreen.groupKey === "accounts" && formatCurrency(item.balance)}
+                    {groupScreen.groupKey === "credit-cards" && `₹${item.creditLimit} limit`}
+                    {groupScreen.groupKey === "loans" && `₹${item.principal} principal`}
+                  </p>
                 </div>
-                <button
-                  onClick={() => handleDeleteAccount(item.id!)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ml-3 ${
-                    isConfirming
-                      ? "bg-destructive text-white animate-pulse"
-                      : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  }`}
-                >
-                  {isConfirming ? (
-                    <><Check className="w-3.5 h-3.5" /> Confirm</>
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </button>
+                <div className="flex items-center gap-2 ml-3">
+                  <button
+                    onClick={() => handleStartEdit(item, groupScreen.groupKey)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => deleteFunc(item.id!)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                      isConfirming
+                        ? "bg-destructive text-white animate-pulse"
+                        : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    }`}
+                  >
+                    {isConfirming ? (
+                      <><Check className="w-3.5 h-3.5" /> Confirm</>
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -772,25 +1131,35 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
 
           {editOpen && (
             <div className="py-2 pl-7 space-y-0.5">
-              {/* Assets sub-header */}
-              <p className="text-[10px] uppercase tracking-widest text-primary font-bold pt-2 pb-1 px-3 neon-text">Assets</p>
-              {[
-                { label: "Accounts", screen: { type: "asset" as const, groupKey: "accounts" as const, label: "Accounts" } },
-                { label: "Credit Cards", screen: { type: "asset" as const, groupKey: "credit-cards" as const, label: "Credit Cards" } },
-              ].map(({ label, screen }) => (
-                <button key={label} onClick={() => setGroupScreen(screen)}
-                  className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
-                  {label}
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-              ))}
+              {/* Accounts */}
+              <button 
+                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "accounts" as const, label: "Accounts" })}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
+                Accounts
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
 
-              {/* Loans sub-header */}
-              <p className="text-[10px] uppercase tracking-widest text-primary font-bold pt-2 pb-1 px-3 neon-text">Loans</p>
-              <button
-                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
-              >
-                Manage Loans
+              {/* Credit Cards */}
+              <button 
+                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "credit-cards" as const, label: "Credit Cards" })}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
+                Credit Cards
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+
+              {/* Loans */}
+              <button 
+                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "loans" as const, label: "Loans" })}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
+                Loans
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+
+              {/* Liabilities */}
+              <button 
+                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "liabilities" as const, label: "Liabilities" })}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
+                Liabilities
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>

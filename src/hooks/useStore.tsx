@@ -40,6 +40,7 @@ export interface CreditCard {
   id: string;
   name: string;
   provider: string;
+  cardType?: string;
   cardNumber?: string;
   creditLimit: number;
   outstanding: number;
