@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { format } from "date-fns";
 
-function AccountRow({ account, onChange, onDelete }: { account: Account; onChange: (val: number) => void; onDelete?: () => void }) {
+function AccountRow({ account, onChange, onNameChange, onDelete }: { account: Account; onChange: (val: number) => void; onNameChange?: (name: string) => void; onDelete?: () => void }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [val, setVal] = useState(account.balance.toString());
@@ -27,7 +27,11 @@ function AccountRow({ account, onChange, onDelete }: { account: Account; onChang
 
   const handleNameBlur = () => {
     setIsNameEditing(false);
-    // Could add name update here if needed
+    if (onNameChange && nameVal.trim() !== '') {
+      onNameChange(nameVal);
+    } else {
+      setNameVal(account.name);
+    }
   };
 
   const handleAmountClick = () => {
@@ -90,52 +94,18 @@ interface GroupSectionProps {
   trackOnly?: boolean;
   children: React.ReactNode;
   onAddNew?: () => void;
-  isEditable?: boolean;
 }
 
-function GroupSection({ label, total, trackOnly, children, onAddNew, isEditable }: GroupSectionProps) {
+function GroupSection({ label, total, trackOnly, children, onAddNew }: GroupSectionProps) {
   const [open, setOpen] = useState(false);
-  const [isTitleEditing, setIsTitleEditing] = useState(false);
-  const [titleVal, setTitleVal] = useState(label);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimer = useRef<NodeJS.Timeout>();
-
-  useEffect(() => { if (isTitleEditing && titleInputRef.current) titleInputRef.current.focus(); }, [isTitleEditing]);
-
-  const handleTitleBlur = () => {
-    setIsTitleEditing(false);
-  };
-
-  const handleLongPress = () => {
-    longPressTimer.current = setTimeout(() => {
-      setIsTitleEditing(true);
-    }, 500);
-  };
-
-  const handleLongPressEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  };
 
   return (
     <div>
       <button onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-1 py-2"
-        onMouseDown={handleLongPress}
-        onMouseUp={handleLongPressEnd}
-        onMouseLeave={handleLongPressEnd}
-        onTouchStart={handleLongPress}
-        onTouchEnd={handleLongPressEnd}
       >
         <div className="flex items-center gap-2">
-          {isTitleEditing ? (
-            <input ref={titleInputRef} type="text" value={titleVal}
-              onChange={(e) => setTitleVal(e.target.value)} onBlur={handleTitleBlur}
-              onKeyDown={(e) => e.key === "Enter" && handleTitleBlur()}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-transparent border-b border-primary text-xs outline-none font-bold tracking-wider uppercase" />
-          ) : (
-            <span className={`font-bold tracking-wider uppercase text-xs ${label === 'Lent' ? 'text-gray-400' : 'text-primary neon-text'}`}>{label}</span>
-          )}
+          <span className={`font-bold tracking-wider uppercase text-xs ${label === 'Lent' ? 'text-gray-400' : 'text-primary neon-text'}`}>{label}</span>
           {trackOnly && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground uppercase tracking-wide">tracking</span>
           )}
@@ -172,6 +142,15 @@ export function AssetsTab() {
     }));
   };
 
+  const handleAccountNameUpdate = (id: string, newName: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      accounts: prev.accounts.map((a) =>
+        a.id === id ? { ...a, name: newName } : a
+      ),
+    }));
+  };
+
   const handleAddAccount = (type: "cash" | "bank" | "business" | "investments" | "insurance" | "other") => {
     updateStore((prev) => ({
       ...prev,
@@ -199,7 +178,7 @@ export function AssetsTab() {
   const investmentTotal = investmentAccounts.reduce((sum, a) => sum + a.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, a) => sum + a.balance, 0);
   const otherTotal = otherAccounts.reduce((sum, a) => sum + a.balance, 0);
-  const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal + otherTotal;
+  const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
@@ -213,35 +192,40 @@ export function AssetsTab() {
       <GroupSection label="Bank & Cash" total={bankTotal} onAddNew={() => handleAddAccount("bank")}>
         {bankAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)} />
+            onChange={(val) => handleAccountUpdate(acc.id!, val)}
+            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
         ))}
       </GroupSection>
 
       <GroupSection label="Business" total={businessTotal} onAddNew={() => handleAddAccount("business")}>
         {businessAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)} />
+            onChange={(val) => handleAccountUpdate(acc.id!, val)}
+            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
         ))}
       </GroupSection>
 
       <GroupSection label="Investments" total={investmentTotal} onAddNew={() => handleAddAccount("investments")}>
         {investmentAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)} />
+            onChange={(val) => handleAccountUpdate(acc.id!, val)}
+            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
         ))}
       </GroupSection>
 
       <GroupSection label="Insurance" total={insuranceTotal} onAddNew={() => handleAddAccount("insurance")}>
         {insuranceAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)} />
+            onChange={(val) => handleAccountUpdate(acc.id!, val)}
+            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
         ))}
       </GroupSection>
 
       <GroupSection label="Lent" total={otherTotal} onAddNew={() => handleAddAccount("other")}>
         {otherAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)} />
+            onChange={(val) => handleAccountUpdate(acc.id!, val)}
+            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
         ))}
       </GroupSection>
     </div>
