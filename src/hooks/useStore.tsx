@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import * as backupService from "@/lib/backupService";
 
 export type TransactionType = "in" | "out";
 
@@ -309,6 +310,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       window.localStorage.setItem(STORE_KEY, JSON.stringify(store));
     } catch (error) {
       console.error("Failed to save MoneyMind data:", error);
+    }
+  }, [store]);
+
+  // Auto-backup logic
+  useEffect(() => {
+    if (!backupService.isAutoBackupEnabled()) return;
+    if (!backupService.shouldRunAutoBackup()) return;
+
+    try {
+      backupService.createBackup(store);
+      backupService.recordAutoBackupTime();
+      console.log("Auto-backup completed successfully");
+    } catch (error) {
+      console.error("Auto-backup failed:", error);
     }
   }, [store]);
 

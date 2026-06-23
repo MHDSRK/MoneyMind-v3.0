@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useStore } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
+import * as backupService from "@/lib/backupService";
 import {
   X, ChevronDown, ChevronRight, ChevronLeft,
   Download, Pencil, Trash2, Plus, Check
@@ -106,6 +107,12 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   const [editOpen, setEditOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
 
+  // Backup state
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => backupService.isAutoBackupEnabled());
+  const [backups, setBackups] = useState(() => backupService.getBackupsMetadata());
+  const [lastAutoBackupTime, setLastAutoBackupTime] = useState(() => backupService.getLastAutoBackupTime());
+  const [backupsListOpen, setBackupsListOpen] = useState(false);
+
   // Group detail screen
   const [groupScreen, setGroupScreen] = useState<GroupScreen | null>(null);
 
@@ -175,18 +182,56 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   // ── Backup/Restore handlers ──────────────────────────────────────────────
-  const handleBackup = () => {
-    const backup = JSON.stringify(store, null, 2);
-    const blob = new Blob([backup], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `MoneyMind_Backup_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleCreateBackup = () => {
+    try {
+      const metadata = backupService.createBackup(store);
+      setBackups(backupService.getBackupsMetadata());
+      alert(`✓ Backup created successfully!\n${metadata.size} bytes stored`);
+    } catch (err) {
+      alert(`❌ Backup failed: ${err}`);
+    }
   };
 
-  const handleRestore = () => {
+  const handleAutoBackupToggle = (enabled: boolean) => {
+    backupService.setAutoBackupEnabled(enabled);
+    setAutoBackupEnabled(enabled);
+    alert(enabled ? "✓ Auto-backup enabled (daily)" : "⚠️ Auto-backup disabled");
+  };
+
+  const handleDownloadBackup = (backupId: string, fileName: string) => {
+    try {
+      backupService.exportBackupAsFile(backupId, fileName);
+    } catch (err) {
+      alert(`❌ Download failed: ${err}`);
+    }
+  };
+
+  const handleRestoreBackup = (backupId: string) => {
+    const backup = backupService.getBackup(backupId);
+    if (!backup) {
+      alert("❌ Backup not found");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "⚠️ This will replace all current data with this backup. Are you sure?"
+    );
+    if (confirmed) {
+      updateStore(() => backup);
+      alert("✓ Backup restored successfully!");
+    }
+  };
+
+  const handleDeleteBackupLocal = (backupId: string) => {
+    const confirmed = window.confirm("Delete this backup? This cannot be undone.");
+    if (confirmed) {
+      backupService.deleteBackup(backupId);
+      setBackups(backupService.getBackupsMetadata());
+      alert("✓ Backup deleted");
+    }
+  };
+
+  const handleRestoreFromFile = () => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
@@ -198,11 +243,11 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
         try {
           const backup = JSON.parse(event.target?.result as string);
           const confirmed = window.confirm(
-            "⚠️ This will replace all current data with the backup. Are you sure?"
+            "⚠️ This will replace all current data with the uploaded backup. Are you sure?"
           );
           if (confirmed) {
             updateStore(() => backup);
-            alert("✓ Backup restored successfully!");
+            alert("✓ Data restored successfully!");
           }
         } catch (err) {
           alert("❌ Invalid backup file");
@@ -408,25 +453,97 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           >
             <div className="flex items-center gap-3">
               <Download className="w-4 h-4 text-primary" />
-              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Backup</span>
+              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Backup & Restore</span>
             </div>
             {backupOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           </button>
 
           {backupOpen && (
             <div className="py-2 space-y-0.5 pl-7">
+              {/* Auto-backup toggle */}
+              <div className="py-3 px-3 rounded-xl bg-white/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-foreground">Auto-backup (Daily)</span>
+                  <button
+                    onClick={() => handleAutoBackupToggle(!autoBackupEnabled)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      autoBackupEnabled
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-white/10 text-muted-foreground"
+                    }`}
+                  >
+                    {autoBackupEnabled ? "ON" : "OFF"}
+                  </button>
+                </div>
+                {lastAutoBackupTime && (
+                  <p className="text-xs text-muted-foreground">
+                    Last backup: {format(new Date(lastAutoBackupTime), "MMM d, yyyy HH:mm")}
+                  </p>
+                )}
+              </div>
+
+              {/* Manual backup button */}
               <button
-                onClick={handleBackup}
+                onClick={handleCreateBackup}
                 className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
               >
-                Export Backup
+                Backup Now
                 <Download className="w-3.5 h-3.5 text-primary opacity-60" />
               </button>
+
+              {/* Backups list toggle */}
               <button
-                onClick={handleRestore}
+                onClick={() => setBackupsListOpen((o) => !o)}
                 className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
               >
-                Import Backup
+                Backups ({backups.length})
+                {backupsListOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* Backups list */}
+              {backupsListOpen && (
+                <div className="ml-3 space-y-1 mt-2 max-h-48 overflow-y-auto">
+                  {backups.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2 text-center italic">No backups yet</p>
+                  ) : (
+                    backups.map((backup, idx) => (
+                      <div key={backup.id} className="bg-black/30 rounded-lg p-2 space-y-1">
+                        <p className="text-xs font-medium text-foreground">{idx === 0 ? "Latest" : ""} {backup.fileName}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {format(new Date(backup.timestamp), "MMM d, yyyy HH:mm")}
+                        </p>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleRestoreBackup(backup.id)}
+                            className="flex-1 text-[10px] bg-primary/20 border border-primary/30 text-primary px-2 py-1 rounded font-bold hover:bg-primary/30 transition-all"
+                          >
+                            Restore
+                          </button>
+                          <button
+                            onClick={() => handleDownloadBackup(backup.id, backup.fileName)}
+                            className="flex-1 text-[10px] bg-white/10 border border-white/20 text-muted-foreground px-2 py-1 rounded font-bold hover:bg-white/20 transition-all"
+                          >
+                            Download
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBackupLocal(backup.id)}
+                            className="flex-1 text-[10px] bg-destructive/20 border border-destructive/30 text-destructive px-2 py-1 rounded font-bold hover:bg-destructive/30 transition-all"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Import from file */}
+              <button
+                onClick={handleRestoreFromFile}
+                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
+              >
+                Import Backup File
                 <ChevronRight className="w-3.5 h-3.5 text-primary opacity-60" />
               </button>
             </div>
