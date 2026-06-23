@@ -134,6 +134,20 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   // Add new item in group
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newAccountType, setNewAccountType] = useState<"cash" | "bank" | "business" | "investments" | "insurance" | "other">("bank");
+  
+  // Credit card add fields
+  const [newCreditCardProvider, setNewCreditCardProvider] = useState("");
+  const [newCreditCardType, setNewCreditCardType] = useState("");
+  const [newCreditCardLimit, setNewCreditCardLimit] = useState("");
+  
+  // Loan add fields
+  const [newLoanLender, setNewLoanLender] = useState("");
+  const [newLoanPrincipal, setNewLoanPrincipal] = useState("");
+  const [newLoanEMI, setNewLoanEMI] = useState("");
+  
+  // Liability add fields
+  const [newLiabilityAmount, setNewLiabilityAmount] = useState("");
 
   // Edit item
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -149,6 +163,14 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       setConfirmId(null);
       setIsAdding(false);
       setNewName("");
+      setNewAccountType("bank");
+      setNewCreditCardProvider("");
+      setNewCreditCardType("");
+      setNewCreditCardLimit("");
+      setNewLoanLender("");
+      setNewLoanPrincipal("");
+      setNewLoanEMI("");
+      setNewLiabilityAmount("");
       setCustomOpen(false);
       setEditingItemId(null);
       setEditFormData(null);
@@ -260,11 +282,12 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           {
             id: crypto.randomUUID(),
             name: newName.trim(),
-            type: "other",
+            type: newAccountType,
             balance: 0,
           },
         ],
       }));
+      setNewAccountType("bank");
     } else if (groupKey === "credit-cards") {
       updateStore((prev) => ({
         ...prev,
@@ -273,9 +296,9 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           {
             id: crypto.randomUUID(),
             name: newName.trim(),
-            provider: "",
-            cardType: "",
-            creditLimit: 0,
+            provider: newCreditCardProvider.trim(),
+            cardType: newCreditCardType.trim(),
+            creditLimit: parseInt(newCreditCardLimit) || 0,
             outstanding: 0,
             unbilled: 0,
             statementDate: 1,
@@ -285,6 +308,9 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           },
         ],
       }));
+      setNewCreditCardProvider("");
+      setNewCreditCardType("");
+      setNewCreditCardLimit("");
     } else if (groupKey === "loans") {
       updateStore((prev) => ({
         ...prev,
@@ -293,22 +319,31 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           {
             id: crypto.randomUUID(),
             name: newName.trim(),
-            lender: "",
-            principal: 0,
+            lender: newLoanLender.trim(),
+            principal: parseInt(newLoanPrincipal) || 0,
             interestRate: 0,
-            emiAmount: 0,
+            emiAmount: parseInt(newLoanEMI) || 0,
             emiCount: 60,
             paidCount: 0,
             emiFrequency: "monthly" as const,
-            outstanding: 0,
+            outstanding: parseInt(newLoanPrincipal) || 0,
             startDate: new Date().toISOString().split("T")[0],
             nextEmiDate: new Date().toISOString().split("T")[0],
             createdAt: new Date().toISOString(),
           },
         ],
       }));
+      setNewLoanLender("");
+      setNewLoanPrincipal("");
+      setNewLoanEMI("");
     }
-    setNewName(""); setIsAdding(false);
+    setNewName(""); 
+    setIsAdding(false);
+    setNewAccountType("bank");
+    setNewCreditCardProvider("");
+    setNewCreditCardType("");
+    setNewCreditCardLimit("");
+    setNewLiabilityAmount("");
   };
 
   // ── Export handler ──────────────────────────────────────────────────────
@@ -779,7 +814,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
 
           {/* Add form */}
           {isAdding ? (
-            <div className="mt-4 flex items-center gap-2">
+            <div className="mt-4 space-y-2">
               <input
                 type="text"
                 autoFocus
@@ -792,20 +827,106 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
                   if (e.key === "Escape") { setIsAdding(false); setNewName(""); }
                 }}
                 placeholder="Enter name…"
-                className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
               />
-              <button
-                onClick={() => {
-                  handleAddAccount(groupScreen.groupKey);
+              {groupScreen.groupKey === "accounts" && (
+                <select
+                  value={newAccountType}
+                  onChange={(e) => setNewAccountType(e.target.value as any)}
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary text-foreground"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="bank">Bank</option>
+                  <option value="business">Business</option>
+                  <option value="investments">Investments</option>
+                  <option value="insurance">Insurance</option>
+                  <option value="other">Lent</option>
+                </select>
+              )}
+              {groupScreen.groupKey === "credit-cards" && (
+                <>
+                  <input
+                    type="text"
+                    value={newCreditCardProvider}
+                    onChange={(e) => setNewCreditCardProvider(e.target.value)}
+                    placeholder="Provider (e.g., SBI, HDFC)"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="text"
+                    value={newCreditCardType}
+                    onChange={(e) => setNewCreditCardType(e.target.value)}
+                    placeholder="Card Type (e.g., VISA SIGNATURE)"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    value={newCreditCardLimit}
+                    onChange={(e) => setNewCreditCardLimit(e.target.value)}
+                    placeholder="Credit Limit (₹)"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </>
+              )}
+              {groupScreen.groupKey === "loans" && (
+                <>
+                  <input
+                    type="text"
+                    value={newLoanLender}
+                    onChange={(e) => setNewLoanLender(e.target.value)}
+                    placeholder="Lender (e.g., Cred, Bank)"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    value={newLoanPrincipal}
+                    onChange={(e) => setNewLoanPrincipal(e.target.value)}
+                    placeholder="Principal Amount (₹)"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    value={newLoanEMI}
+                    onChange={(e) => setNewLoanEMI(e.target.value)}
+                    placeholder="EMI Amount (₹)"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </>
+              )}
+              {groupScreen.groupKey === "liabilities" && (
+                <input
+                  type="number"
+                  value={newLiabilityAmount}
+                  onChange={(e) => setNewLiabilityAmount(e.target.value)}
+                  placeholder="Amount (₹)"
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    handleAddAccount(groupScreen.groupKey);
+                  }}
+                  className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-bold"
+                >
+                  Add
+                </button>
+                <button onClick={() => { 
+                  setIsAdding(false); 
+                  setNewName(""); 
+                  setNewAccountType("bank");
+                  setNewCreditCardProvider("");
+                  setNewCreditCardType("");
+                  setNewCreditCardLimit("");
+                  setNewLoanLender("");
+                  setNewLoanPrincipal("");
+                  setNewLoanEMI("");
+                  setNewLiabilityAmount("");
                 }}
-                className="bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-bold"
-              >
-                Add
-              </button>
-              <button onClick={() => { setIsAdding(false); setNewName(""); }}
-                className="text-muted-foreground px-2">
-                <X className="w-4 h-4" />
-              </button>
+                  className="text-muted-foreground px-2">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ) : (
             <button

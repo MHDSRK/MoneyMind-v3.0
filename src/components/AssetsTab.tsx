@@ -55,7 +55,7 @@ function GroupSection({ label, total, trackOnly, children }: GroupSectionProps) 
       <button onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-1 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-primary font-bold tracking-wider uppercase text-xs neon-text">{label}</span>
+          <span className={`font-bold tracking-wider uppercase text-xs ${label === 'Lent' ? 'text-gray-400' : 'text-primary neon-text'}`}>{label}</span>
           {trackOnly && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground uppercase tracking-wide">tracking</span>
           )}
@@ -131,7 +131,7 @@ export function AssetsTab() {
         ))}
       </GroupSection>
 
-      <GroupSection label="Lent (Don't add in total)" total={otherTotal}>
+      <GroupSection label="Lent" total={otherTotal}>
         {otherAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />

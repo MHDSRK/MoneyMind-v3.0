@@ -45,7 +45,7 @@ export function LoansTab() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-bold text-foreground">{loan.name}</p>
-                  <p className="text-xs text-muted-foreground">Loan amount</p>
+                  <p className="text-xs text-muted-foreground">{formatCurrency(loan.principal)} principal</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
