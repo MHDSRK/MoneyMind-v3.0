@@ -26,7 +26,6 @@ name: TypeScript Type Check
 runs-on: ubuntu-latest
 timeout-minutes: 10
 
-```
 steps:
   - name: Checkout repository
     uses: actions/checkout@v5
@@ -47,7 +46,6 @@ steps:
 
   - name: TypeScript type check
     run: pnpm typecheck
-```
 
 build:
 name: Production Build
@@ -55,7 +53,6 @@ needs: typecheck
 runs-on: ubuntu-latest
 timeout-minutes: 10
 
-```
 steps:
   - name: Checkout repository
     uses: actions/checkout@v5
@@ -83,7 +80,6 @@ steps:
       name: build
       path: dist/
       retention-days: 7
-```
 
 test:
 name: Run Tests
@@ -91,7 +87,6 @@ needs: typecheck
 runs-on: ubuntu-latest
 timeout-minutes: 10
 
-```
 steps:
   - name: Checkout repository
     uses: actions/checkout@v5
@@ -116,4 +111,3 @@ steps:
   - name: Generate coverage
     run: pnpm test:coverage -- --run
     continue-on-error: true
-```
