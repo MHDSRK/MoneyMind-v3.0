@@ -17,10 +17,9 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install pnpm globally
-        run: |
-          npm install -g pnpm@10.30.3
-          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.30.3
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -38,10 +37,9 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install pnpm globally
-        run: |
-          npm install -g pnpm@10.30.3
-          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.30.3
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
@@ -66,10 +64,9 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install pnpm globally
-        run: |
-          npm install -g pnpm@10.30.3
-          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.30.3
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --no-optional
