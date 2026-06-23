@@ -19,11 +19,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --no-optional
 
       - name: Type check
         run: pnpm typecheck
@@ -40,11 +40,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --no-optional
 
       - name: Build
         run: pnpm build
@@ -68,11 +68,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --no-optional
 
       - name: Run tests
         run: pnpm test -- --run
@@ -94,7 +94,7 @@ jobs:
   #
   #     - uses: actions/setup-node@v4
   #       with:
-  #         node-version: "18"
+  #         node-version: "22"
   #         cache: "pnpm"
   #
   #     - name: Install dependencies

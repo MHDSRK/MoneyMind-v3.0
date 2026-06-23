@@ -75,5 +75,9 @@
     "typescript": "^5.7.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.8"
+  },
+  "optionalDependencies": {
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.35.2"
   }
 }
