@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRoute, useLocation } from "wouter";
 import { HomeTab } from "@/components/HomeTab";
 import { TodayTab } from "@/components/TodayTab";
 import { AssetsTab } from "@/components/AssetsTab";
@@ -12,29 +13,25 @@ import { cn } from "@/lib/utils";
 const walletIconPath = "/favicon.svg";
 const profileIconPath = "/favicon.svg";
 
-type Tab = "home" | "today" | "assets" | "liabilities" | "credit-cards" | "loans";
-
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("home");
+  const [, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Route matching
+  const [matchHome] = useRoute("/");
+  const [matchToday] = useRoute("/today");
+  const [matchAssets] = useRoute("/assets");
+  const [matchCards] = useRoute("/cards");
+  const [matchLoans] = useRoute("/loans");
+  const [matchOthers] = useRoute("/others");
+
   const renderTab = () => {
-    switch (activeTab) {
-      case "home":
-        return <HomeTab />;
-      case "today":
-        return <TodayTab />;
-      case "assets":
-        return <AssetsTab />;
-      case "liabilities":
-        return <LiabilitiesTab />;
-      case "credit-cards":
-        return <CreditCardsTab />;
-      case "loans":
-        return <LoansTab />;
-      default:
-        return null;
-    }
+    if (matchToday) return <TodayTab />;
+    if (matchAssets) return <AssetsTab />;
+    if (matchCards) return <CreditCardsTab />;
+    if (matchLoans) return <LoansTab />;
+    if (matchOthers) return <LiabilitiesTab />;
+    return <HomeTab />; // Default route
   };
 
   return (
@@ -62,17 +59,17 @@ function App() {
       <nav className="fixed bottom-0 inset-x-0 h-20 z-40 bg-background/80 backdrop-blur-xl border-t border-white/10 pb-safe overflow-x-auto">
         <div className="flex items-center justify-start h-full px-4 max-w-md mx-auto gap-1 min-w-max">
           <NavButton icon={<Home className="w-5 h-5" />} label="Home"
-            isActive={activeTab === "home"} onClick={() => setActiveTab("home")} />
+            isActive={matchHome} onClick={() => setLocation("/")} />
           <NavButton icon={<Calendar className="w-5 h-5" />} label="Today"
-            isActive={activeTab === "today"} onClick={() => setActiveTab("today")} />
+            isActive={matchToday} onClick={() => setLocation("/today")} />
           <NavButton icon={<WalletCards className="w-5 h-5" />} label="Assets"
-            isActive={activeTab === "assets"} onClick={() => setActiveTab("assets")} />
+            isActive={matchAssets} onClick={() => setLocation("/assets")} />
           <NavButton icon={<CreditCard className="w-5 h-5" />} label="Cards"
-            isActive={activeTab === "credit-cards"} onClick={() => setActiveTab("credit-cards")} />
+            isActive={matchCards} onClick={() => setLocation("/cards")} />
           <NavButton icon={<Landmark className="w-5 h-5" />} label="Loans"
-            isActive={activeTab === "loans"} onClick={() => setActiveTab("loans")} />
+            isActive={matchLoans} onClick={() => setLocation("/loans")} />
           <NavButton icon={<CreditCard className="w-5 h-6" />} label="Others"
-            isActive={activeTab === "liabilities"} onClick={() => setActiveTab("liabilities")} />
+            isActive={matchOthers} onClick={() => setLocation("/others")} />
         </div>
       </nav>
 
