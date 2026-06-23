@@ -33,12 +33,9 @@ export function CreditCardsTab() {
     : 0,
   statementDate: formData.statementDate,
   dueDate: formData.dueDate,
-
-  // 👇 Add this line
   nextDueDate: editingId
     ? (store.creditCards.find((c) => c.id === editingId)?.nextDueDate ?? "")
     : "",
-
   createdAt: editingId
     ? (store.creditCards.find((c) => c.id === editingId)?.createdAt || new Date().toISOString())
     : new Date().toISOString(),

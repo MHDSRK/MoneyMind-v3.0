@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useStore, LiabilityItem } from "@/hooks/useStore";
+import { useStore } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import {
   X, ChevronDown, ChevronRight, ChevronLeft,
@@ -8,19 +8,14 @@ import {
 import * as XLSX from "xlsx";
 import { format, parseISO, startOfMonth, subMonths } from "date-fns";
 
-const LIABILITY_GROUPS = [
-  "Credit Cards", "Loan & EMI", "Chitty", "Regular Expenses", "Borrows", "Others",
-];
-
 type GroupScreen =
-  | { type: "asset"; groupKey: "accounts" | "credit-cards"; label: string }
-  | { type: "liability"; group: string };
+  | { type: "asset"; groupKey: "accounts" | "credit-cards"; label: string };
 
 // ── Excel export ────────────────────────────────────────────────────────────
 function buildAndDownload(
   transactions: ReturnType<typeof useStore>["store"]["transactions"],
-  liabilities: ReturnType<typeof useStore>["store"]["liabilities"],
-  lends: ReturnType<typeof useStore>["store"]["lends"],
+  creditCards: ReturnType<typeof useStore>["store"]["creditCards"],
+  loans: ReturnType<typeof useStore>["store"]["loans"],
   accounts: ReturnType<typeof useStore>["store"]["accounts"],
   label: string
 ) {
@@ -29,42 +24,44 @@ function buildAndDownload(
   // Sheet 1: Transactions
   const txRows = transactions.map((tx) => ({
     Date: format(new Date(tx.date), "dd/MM/yyyy"),
-    Time: format(new Date(tx.date), "HH:mm"),
     Type: tx.type === "in" ? "Money In" : "Money Out",
     "Ledger / Name": tx.ledger,
     Category: tx.category,
-    Account: tx.account,
+    "From Account": tx.fromAccount || "",
+    "To Account": tx.toAccount || "",
     "Amount (₹)": tx.amount,
+    Notes: tx.notes || "",
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows), "Transactions");
 
   // Sheet 2: Accounts
-  const acctRows = accounts.map((a) => ({
-    Group: a.group === "accounts" ? "Bank/Cash" : "Credit Card",
+  const acctRows = accounts.filter(a => !a.deleted).map((a) => ({
     Name: a.name,
+    Type: a.type,
     "Balance (₹)": a.balance,
-    Status: a.deleted ? "Deleted" : "Active",
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(acctRows), "Accounts");
 
-  // Sheet 3: Liabilities (all, including deleted)
-  const liabRows = liabilities.map((l) => ({
-    Group: l.group,
-    Name: l.name,
-    "Amount (₹)": l.amount,
-    "Due Date": l.dueDate || "",
-    Status: l.deleted ? "Deleted" : "Active",
+  // Sheet 3: Credit Cards
+  const ccRows = creditCards.filter(c => !c.deleted).map((c) => ({
+    Name: c.name,
+    Provider: c.provider,
+    "Credit Limit (₹)": c.creditLimit,
+    "Outstanding (₹)": c.outstanding,
+    "Available (₹)": c.creditLimit - c.outstanding,
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(liabRows), "Liabilities");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ccRows), "Credit Cards");
 
-  // Sheet 4: Lends (all, including deleted)
-  const lendRows = lends.map((l) => ({
+  // Sheet 4: Loans
+  const loanRows = loans.filter(l => !l.deleted).map((l) => ({
     Name: l.name,
-    "Amount (₹)": l.amount,
-    Date: l.date,
-    Status: l.deleted ? "Deleted" : "Active",
+    Lender: l.lender,
+    "Principal (₹)": l.principal,
+    "Interest Rate (%)": l.interestRate,
+    "EMI (₹)": l.emiAmount,
+    "Outstanding (₹)": l.outstanding,
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lendRows), "Lends");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(loanRows), "Loans");
 
   XLSX.writeFile(wb, `MoneyMind_${label.replace(/\s+/g, "_")}.xlsx`);
 }
@@ -139,31 +136,17 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   }, [open]);
 
   // ── Delete helpers ──────────────────────────────────────────────────────
-  const handleDeleteAccount = (name: string, groupKey: string) => {
-    if (confirmId === `acc-${name}`) {
+  const handleDeleteAccount = (id: string) => {
+    if (confirmId === `acc-${id}`) {
       updateStore((prev) => ({
         ...prev,
         accounts: prev.accounts.map((a) =>
-          a.name === name && a.group === groupKey ? { ...a, deleted: true } : a
+          a.id === id ? { ...a, deleted: true } : a
         ),
       }));
       setConfirmId(null);
     } else {
-      setConfirmId(`acc-${name}`);
-    }
-  };
-
-  const handleDeleteLiability = (id: string) => {
-    if (confirmId === `liab-${id}`) {
-      updateStore((prev) => ({
-        ...prev,
-        liabilities: prev.liabilities.map((l) =>
-          l.id === id ? { ...l, deleted: true } : l
-        ),
-      }));
-      setConfirmId(null);
-    } else {
-      setConfirmId(`liab-${id}`);
+      setConfirmId(`acc-${id}`);
     }
   };
 
@@ -172,33 +155,23 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
     if (!newName.trim()) return;
     updateStore((prev) => ({
       ...prev,
-     accounts: [
-  ...prev.accounts,
-  {
-    id: crypto.randomUUID(),
-    name: newName.trim(),
-    type: groupKey === "accounts" ? "other" : "other",
-    group: groupKey,
-    balance: 0,
-  },
-],
+      accounts: [
+        ...prev.accounts,
+        {
+          id: crypto.randomUUID(),
+          name: newName.trim(),
+          type: "other",
+          balance: 0,
+        },
+      ],
     }));
-    setNewName(""); setIsAdding(false);
-  };
-
-  const handleAddLiability = (group: string) => {
-    if (!newName.trim()) return;
-    const item: LiabilityItem = {
-      id: crypto.randomUUID(), group, name: newName.trim(), amount: 0, dueDate: "",
-    };
-    updateStore((prev) => ({ ...prev, liabilities: [...prev.liabilities, item] }));
     setNewName(""); setIsAdding(false);
   };
 
   // ── Export handler ──────────────────────────────────────────────────────
   const handleExport = (period: string, label: string) => {
     const filtered = filterTx(store.transactions, period, customStart, customEnd);
-    buildAndDownload(filtered, store.liabilities, store.lends, store.accounts, label);
+    buildAndDownload(filtered, store.creditCards, store.loans, store.accounts, label);
   };
 
   // ── Backup/Restore handlers ──────────────────────────────────────────────
@@ -245,13 +218,11 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
 
   // ── Render: Group Detail Screen ─────────────────────────────────────────
   if (groupScreen) {
-    const items =
-      groupScreen.type === "asset"
-        ? store.accounts.filter((a) => a.group === groupScreen.groupKey && !a.deleted)
-        : store.liabilities.filter((l) => l.group === groupScreen.group && !l.deleted);
+    const items = groupScreen.type === "asset"
+      ? store.accounts.filter((a) => a.id !== undefined && !a.deleted)
+      : [];
 
-    const label =
-      groupScreen.type === "asset" ? groupScreen.label : groupScreen.group;
+    const label = groupScreen.label;
 
     return (
       <div className="fixed inset-0 z-50 bg-[#090A0F] flex flex-col">
@@ -270,33 +241,17 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
             <p className="text-muted-foreground italic text-sm text-center py-8">No items</p>
           )}
           {items.map((item) => {
-            const id = groupScreen.type === "asset"
-              ? `acc-${(item as typeof store.accounts[0]).name}`
-              : `liab-${(item as LiabilityItem).id}`;
+            const id = `acc-${item.id}`;
             const isConfirming = confirmId === id;
             return (
               <div key={id}
                 className="flex items-center justify-between py-3.5 border-b border-white/5 last:border-0">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{(item as { name: string }).name}</p>
-                  {groupScreen.type === "asset" && (
-                    <p className="text-xs text-[#34d399]">{formatCurrency((item as typeof store.accounts[0]).balance)}</p>
-                  )}
-                  {groupScreen.type === "liability" && (
-                    <p className="text-xs text-destructive">{formatCurrency((item as LiabilityItem).amount)}</p>
-                  )}
+                  <p className="font-medium text-sm">{item.name}</p>
+                  <p className="text-xs text-[#34d399]">{formatCurrency(item.balance)}</p>
                 </div>
                 <button
-                  onClick={() => {
-                    if (groupScreen.type === "asset") {
-                      handleDeleteAccount(
-                        (item as typeof store.accounts[0]).name,
-                        groupScreen.groupKey
-                      );
-                    } else {
-                      handleDeleteLiability((item as LiabilityItem).id);
-                    }
-                  }}
+                  onClick={() => handleDeleteAccount(item.id!)}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ml-3 ${
                     isConfirming
                       ? "bg-destructive text-white animate-pulse"
@@ -323,8 +278,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    if (groupScreen.type === "asset") handleAddAccount(groupScreen.groupKey);
-                    else handleAddLiability(groupScreen.group);
+                    handleAddAccount(groupScreen.groupKey);
                   }
                   if (e.key === "Escape") { setIsAdding(false); setNewName(""); }
                 }}
@@ -333,8 +287,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
               />
               <button
                 onClick={() => {
-                  if (groupScreen.type === "asset") handleAddAccount(groupScreen.groupKey);
-                  else handleAddLiability(groupScreen.group);
+                  handleAddAccount(groupScreen.groupKey);
                 }}
                 className="bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-bold"
               >
@@ -366,12 +319,6 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
   }
 
   // ── Render: Main Menu ───────────────────────────────────────────────────
-  const allLiabilityGroups = [
-    ...LIABILITY_GROUPS,
-    ...Array.from(new Set(store.liabilities.map((l) => l.group))).filter(
-      (g) => !LIABILITY_GROUPS.includes(g)
-    ),
-  ];
 
   return (
     <div className="fixed inset-0 z-50 bg-[#090A0F] flex flex-col">
@@ -514,15 +461,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
                 </button>
               ))}
 
-              {/* Liabilities sub-header */}
-              <p className="text-[10px] uppercase tracking-widest text-primary font-bold pt-4 pb-1 px-3 neon-text">Liabilities</p>
-              {allLiabilityGroups.map((group) => (
-                <button key={group} onClick={() => setGroupScreen({ type: "liability", group })}
-                  className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
-                  {group}
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-              ))}
+
             </div>
           )}
         </div>

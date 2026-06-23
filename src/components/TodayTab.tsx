@@ -5,7 +5,7 @@ import { format } from "date-fns";
 export function TodayTab() {
   const { store } = useStore();
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const todaysTx = store.transactions.filter((t) => t.date.startsWith(todayStr));
+  const todaysTx = store.transactions.filter((t) => !t.deleted && t.date.startsWith(todayStr));
 
   const todayIn = todaysTx.filter((t) => t.type === "in").reduce((sum, t) => sum + t.amount, 0);
   const todayOut = todaysTx.filter((t) => t.type === "out").reduce((sum, t) => sum + t.amount, 0);

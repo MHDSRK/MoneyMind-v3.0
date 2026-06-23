@@ -3,14 +3,16 @@ import { HomeTab } from "@/components/HomeTab";
 import { TodayTab } from "@/components/TodayTab";
 import { AssetsTab } from "@/components/AssetsTab";
 import { LiabilitiesTab } from "@/components/LiabilitiesTab";
+import { CreditCardsTab } from "@/components/CreditCardsTab";
+import { LoansTab } from "@/components/LoansTab";
 import { ProfileMenu } from "@/components/ProfileMenu";
-import { Home, Calendar, WalletCards, CreditCard } from "lucide-react";
+import { Home, Calendar, WalletCards, CreditCard, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const walletIconPath = "/favicon.svg";
 const profileIconPath = "/favicon.svg";
 
-type Tab = "home" | "today" | "assets" | "liabilities";
+type Tab = "home" | "today" | "assets" | "liabilities" | "credit-cards" | "loans";
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
@@ -26,6 +28,10 @@ function App() {
         return <AssetsTab />;
       case "liabilities":
         return <LiabilitiesTab />;
+      case "credit-cards":
+        return <CreditCardsTab />;
+      case "loans":
+        return <LoansTab />;
       default:
         return null;
     }
@@ -53,16 +59,19 @@ function App() {
       </main>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 inset-x-0 h-20 z-40 bg-background/80 backdrop-blur-xl border-t border-white/10 pb-safe">
-        <div className="flex items-center justify-around h-full px-6 max-w-md mx-auto">
-          <NavButton icon={<Home className="w-6 h-6" />} label="Home"
+      <nav className="fixed bottom-0 inset-x-0 h-20 z-40 bg-background/80 backdrop-blur-xl border-t border-white/10 pb-safe overflow-x-auto">
+        <div className="flex items-center justify-start h-full px-4 max-w-md mx-auto gap-1 min-w-max">
+          <NavButton icon={<Home className="w-5 h-5" />} label="Home"
             isActive={activeTab === "home"} onClick={() => setActiveTab("home")} />
-          <NavButton icon={<Calendar className="w-6 h-6" />} label="Today"
+          <NavButton icon={<Calendar className="w-5 h-5" />} label="Today"
             isActive={activeTab === "today"} onClick={() => setActiveTab("today")} />
-          <div className="w-12" />
-          <NavButton icon={<WalletCards className="w-6 h-6" />} label="Assets"
+          <NavButton icon={<WalletCards className="w-5 h-5" />} label="Assets"
             isActive={activeTab === "assets"} onClick={() => setActiveTab("assets")} />
-          <NavButton icon={<CreditCard className="w-6 h-6" />} label="Liabilities"
+          <NavButton icon={<CreditCard className="w-5 h-5" />} label="Cards"
+            isActive={activeTab === "credit-cards"} onClick={() => setActiveTab("credit-cards")} />
+          <NavButton icon={<Landmark className="w-5 h-5" />} label="Loans"
+            isActive={activeTab === "loans"} onClick={() => setActiveTab("loans")} />
+          <NavButton icon={<CreditCard className="w-5 h-6" />} label="Liabilities"
             isActive={activeTab === "liabilities"} onClick={() => setActiveTab("liabilities")} />
         </div>
       </nav>
@@ -81,12 +90,12 @@ function NavButton({ icon, label, isActive, onClick }: {
 }) {
   return (
     <button onClick={onClick}
-      className={cn("flex flex-col items-center justify-center gap-1 w-16 relative transition-all duration-300",
+      className={cn("flex flex-col items-center justify-center gap-1 px-3 py-2 relative transition-all duration-300 shrink-0 whitespace-nowrap",
         isActive ? "text-primary" : "text-muted-foreground hover:text-white/70")}>
       {icon}
-      <span className="text-[10px] font-medium tracking-wide">{label}</span>
+      <span className="text-[9px] font-medium tracking-wide leading-tight">{label}</span>
       {isActive && (
-        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-t-full shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
       )}
     </button>
   );

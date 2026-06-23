@@ -161,6 +161,7 @@ export function HomeTab() {
   };
 
   const visibleAccounts = store.accounts.filter((a) => !a.deleted);
+  const visibleCreditCards = store.creditCards.filter((c) => !c.deleted);
   const moneyInCategories = store.categories
     .filter((c) => c.type === "in" && !c.deleted)
     .map((c) => c.name);
@@ -168,13 +169,10 @@ export function HomeTab() {
     .filter((c) => c.type === "out" && !c.deleted)
     .map((c) => c.name);
 
-  const accountSelect = (
+  const moneyInSelect = (
     <select
-      value={txType === "in" ? toAccount : fromAccount}
-      onChange={(e) => {
-        if (txType === "in") setToAccount(e.target.value);
-        else setFromAccount(e.target.value);
-      }}
+      value={toAccount}
+      onChange={(e) => setToAccount(e.target.value)}
       className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
     >
       <option value="" disabled>
@@ -183,6 +181,28 @@ export function HomeTab() {
       {visibleAccounts.map((a) => (
         <option key={a.id} value={a.name}>
           {a.name}
+        </option>
+      ))}
+    </select>
+  );
+
+  const moneyOutSelect = (
+    <select
+      value={fromAccount}
+      onChange={(e) => setFromAccount(e.target.value)}
+      className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
+    >
+      <option value="" disabled>
+        Select Account or Card
+      </option>
+      {visibleAccounts.map((a) => (
+        <option key={a.id} value={a.name}>
+          {a.name}
+        </option>
+      ))}
+      {visibleCreditCards.map((c) => (
+        <option key={c.id} value={c.name}>
+          💳 {c.name}
         </option>
       ))}
     </select>
@@ -372,7 +392,7 @@ export function HomeTab() {
                     <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
                       Select Account
                     </label>
-                    {accountSelect}
+                    {moneyInSelect}
                   </div>
                 )}
 
@@ -392,9 +412,9 @@ export function HomeTab() {
                 {txType === "out" && (
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
-                      Select Account
+                      Select Account or Card
                     </label>
-                    {accountSelect}
+                    {moneyOutSelect}
                   </div>
                 )}
 
