@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, master, develop]
 
+permissions:
+  contents: read
+
 jobs:
   typecheck:
     name: TypeScript Type Check
@@ -15,8 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: "22"
 
       - name: Enable Corepack
         run: corepack enable
@@ -38,8 +40,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: "22"
 
       - name: Enable Corepack
         run: corepack enable
@@ -68,8 +69,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: "22"
 
       - name: Enable Corepack
         run: corepack enable
