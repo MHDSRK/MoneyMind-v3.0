@@ -10,8 +10,8 @@ import { ProfileMenu } from "@/components/ProfileMenu";
 import { Home, Calendar, WalletCards, CreditCard, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const walletIconPath = "/favicon.svg";
-const profileIconPath = "/favicon.svg";
+const walletIconPath = "/logo.svg";
+const profileIconPath = "/avatar.svg";
 
 // Route to component mapping
 const TAB_COMPONENTS: Record<string, React.ComponentType> = {
