@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { HomeTab } from "@/components/HomeTab";
 import { TodayTab } from "@/components/TodayTab";
 import { AssetsTab } from "@/components/AssetsTab";
@@ -13,26 +13,22 @@ import { cn } from "@/lib/utils";
 const walletIconPath = "/favicon.svg";
 const profileIconPath = "/favicon.svg";
 
+// Route to component mapping
+const TAB_COMPONENTS: Record<string, React.ComponentType> = {
+  "/": HomeTab,
+  "/today": TodayTab,
+  "/assets": AssetsTab,
+  "/cards": CreditCardsTab,
+  "/loans": LoansTab,
+  "/others": LiabilitiesTab,
+};
+
 function App() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Route matching
-  const [matchHome] = useRoute("/");
-  const [matchToday] = useRoute("/today");
-  const [matchAssets] = useRoute("/assets");
-  const [matchCards] = useRoute("/cards");
-  const [matchLoans] = useRoute("/loans");
-  const [matchOthers] = useRoute("/others");
-
-  const renderTab = () => {
-    if (matchToday) return <TodayTab />;
-    if (matchAssets) return <AssetsTab />;
-    if (matchCards) return <CreditCardsTab />;
-    if (matchLoans) return <LoansTab />;
-    if (matchOthers) return <LiabilitiesTab />;
-    return <HomeTab />; // Default route
-  };
+  // Get component for current location, default to HomeTab
+  const CurrentTab = TAB_COMPONENTS[location] || TAB_COMPONENTS["/"];
 
   return (
     <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col relative overflow-x-hidden selection:bg-primary/30">
@@ -52,24 +48,24 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-md mx-auto">
-        {renderTab()}
+        <CurrentTab />
       </main>
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 inset-x-0 h-20 z-40 bg-background/80 backdrop-blur-xl border-t border-white/10 pb-safe overflow-x-auto">
         <div className="flex items-center justify-start h-full px-4 max-w-md mx-auto gap-1 min-w-max">
           <NavButton icon={<Home className="w-5 h-5" />} label="Home"
-            isActive={matchHome} onClick={() => setLocation("/")} />
+            isActive={location === "/"} onClick={() => setLocation("/")} />
           <NavButton icon={<Calendar className="w-5 h-5" />} label="Today"
-            isActive={matchToday} onClick={() => setLocation("/today")} />
+            isActive={location === "/today"} onClick={() => setLocation("/today")} />
           <NavButton icon={<WalletCards className="w-5 h-5" />} label="Assets"
-            isActive={matchAssets} onClick={() => setLocation("/assets")} />
+            isActive={location === "/assets"} onClick={() => setLocation("/assets")} />
           <NavButton icon={<CreditCard className="w-5 h-5" />} label="Cards"
-            isActive={matchCards} onClick={() => setLocation("/cards")} />
+            isActive={location === "/cards"} onClick={() => setLocation("/cards")} />
           <NavButton icon={<Landmark className="w-5 h-5" />} label="Loans"
-            isActive={matchLoans} onClick={() => setLocation("/loans")} />
+            isActive={location === "/loans"} onClick={() => setLocation("/loans")} />
           <NavButton icon={<CreditCard className="w-5 h-6" />} label="Others"
-            isActive={matchOthers} onClick={() => setLocation("/others")} />
+            isActive={location === "/others"} onClick={() => setLocation("/others")} />
         </div>
       </nav>
 
