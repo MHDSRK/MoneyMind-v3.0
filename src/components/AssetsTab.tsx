@@ -171,11 +171,13 @@ export function AssetsTab() {
   const businessAccounts = store.accounts.filter((a) => a.type === "business" && !a.deleted);
   const investmentAccounts = store.accounts.filter((a) => a.type === "investments" && !a.deleted);
   const insuranceAccounts = store.accounts.filter((a) => a.type === "insurance" && !a.deleted);
+  const otherAccounts = store.accounts.filter((a) => a.type === "other" && !a.deleted);
 
   const bankTotal = bankAccounts.reduce((sum, a) => sum + a.balance, 0);
   const businessTotal = businessAccounts.reduce((sum, a) => sum + a.balance, 0);
   const investmentTotal = investmentAccounts.reduce((sum, a) => sum + a.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, a) => sum + a.balance, 0);
+  const otherTotal = otherAccounts.reduce((sum, a) => sum + a.balance, 0);
   const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
 
   return (
@@ -213,6 +215,14 @@ export function AssetsTab() {
 
       <GroupSection label="Insurance" total={insuranceTotal} onAddNew={() => handleAddAccount("insurance")}>
         {insuranceAccounts.map((acc) => (
+          <AccountRow key={acc.id} account={acc}
+            onChange={(val) => handleAccountUpdate(acc.id!, val)}
+            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
+        ))}
+      </GroupSection>
+
+      <GroupSection label="Lent" total={otherTotal} trackOnly onAddNew={() => handleAddAccount("other")}>
+        {otherAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)}
             onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
