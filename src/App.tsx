@@ -53,7 +53,7 @@ function App() {
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 inset-x-0 h-20 z-40 bg-background/80 backdrop-blur-xl border-t border-white/10 pb-safe overflow-x-auto">
-        <div className="flex items-center justify-start h-full px-4 max-w-md mx-auto gap-1 min-w-max">
+        <div className="flex items-center justify-center h-full px-4 gap-1">
           <NavButton icon={<Home className="w-5 h-5" />} label="Home"
             isActive={location === "/"} onClick={() => setLocation("/")} />
           <NavButton icon={<Calendar className="w-5 h-5" />} label="Today"
