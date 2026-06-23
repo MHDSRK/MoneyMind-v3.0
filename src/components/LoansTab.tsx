@@ -2,7 +2,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { useStore } from "@/hooks/useStore";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
 export function LoansTab() {
   const { store, updateStore } = useStore();
@@ -10,12 +10,10 @@ export function LoansTab() {
   const [editName, setEditName] = useState("");
   const [editLender, setEditLender] = useState("");
   const [editPrincipal, setEditPrincipal] = useState("");
+  const [editOutstanding, setEditOutstanding] = useState("");
   const [editEMI, setEditEMI] = useState("");
-  const editNameRef = useRef<HTMLInputElement>(null);
-  const editLenderRef = useRef<HTMLInputElement>(null);
-  const editPrincipalRef = useRef<HTMLInputElement>(null);
-  const editEMIRef = useRef<HTMLInputElement>(null);
-  const longPressTimer = useRef<NodeJS.Timeout>();
+  const [editRemainingMonths, setEditRemainingMonths] = useState("");
+  const [editNextEmiDate, setEditNextEmiDate] = useState("");
 
   const handleAddLoan = () => {
     updateStore((prev) => ({
@@ -48,7 +46,10 @@ export function LoansTab() {
       setEditName(loan.name);
       setEditLender(loan.lender);
       setEditPrincipal(loan.principal.toString());
+      setEditOutstanding(loan.outstanding.toString());
       setEditEMI(loan.emiAmount.toString());
+      setEditRemainingMonths((loan.emiCount - loan.paidCount).toString());
+      setEditNextEmiDate(loan.nextEmiDate ? new Date(loan.nextEmiDate).toISOString().split('T')[0] : "");
     }
   };
 
@@ -61,23 +62,14 @@ export function LoansTab() {
           name: editName,
           lender: editLender,
           principal: parseInt(editPrincipal) || 0,
+          outstanding: parseInt(editOutstanding) || 0,
           emiAmount: parseInt(editEMI) || 0,
-          outstanding: parseInt(editPrincipal) || 0,
+          emiCount: parseInt(editRemainingMonths) + l.paidCount,
+          nextEmiDate: editNextEmiDate ? new Date(editNextEmiDate).toISOString() : l.nextEmiDate,
         } : l
       ),
     }));
     setEditingLoanId(null);
-  };
-
-  const handleLongPress = (e: React.MouseEvent, loanId: string) => {
-    e.preventDefault();
-    longPressTimer.current = setTimeout(() => {
-      handleEditStart(loanId);
-    }, 500);
-  };
-
-  const handleLongPressEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
   const visibleLoans = store.loans.filter((l) => !l.deleted);
@@ -121,84 +113,144 @@ export function LoansTab() {
             return (
               <div 
                 key={loan.id} 
-                className="glass-card p-4 space-y-2"
-                onMouseDown={(e) => handleLongPress(e, loan.id)}
-                onMouseUp={handleLongPressEnd}
-                onMouseLeave={handleLongPressEnd}
-                onTouchStart={(e) => handleLongPress(e as any, loan.id)}
-                onTouchEnd={handleLongPressEnd}
+                className="glass-card p-4 space-y-3"
               >
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <input 
-                      ref={editNameRef}
-                      type="text" 
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleEditSave(loan.id)}
-                      className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm text-foreground outline-none font-bold"
-                    />
-                    <input 
-                      ref={editLenderRef}
-                      type="text" 
-                      value={editLender}
-                      onChange={(e) => setEditLender(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleEditSave(loan.id)}
-                      placeholder="Lender"
-                      className="w-full bg-black/20 border border-primary/50 rounded px-2 py-1 text-xs text-foreground outline-none"
-                    />
-                    <input 
-                      ref={editPrincipalRef}
-                      type="number" 
-                      value={editPrincipal}
-                      onChange={(e) => setEditPrincipal(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleEditSave(loan.id)}
-                      placeholder="Principal Amount"
-                      className="w-full bg-black/20 border border-primary/50 rounded px-2 py-1 text-xs text-foreground outline-none"
-                    />
-                    <input 
-                      ref={editEMIRef}
-                      type="number" 
-                      value={editEMI}
-                      onChange={(e) => setEditEMI(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleEditSave(loan.id)}
-                      placeholder="EMI Amount"
-                      className="w-full bg-black/20 border border-primary/50 rounded px-2 py-1 text-xs text-foreground outline-none"
-                    />
+                {/* Header with Edit Button */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <input 
+                          type="text" 
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Loan Name"
+                          className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm text-foreground outline-none font-bold"
+                        />
+                        <input 
+                          type="text" 
+                          value={editLender}
+                          onChange={(e) => setEditLender(e.target.value)}
+                          placeholder="Lender Name"
+                          className="w-full bg-black/20 border border-primary/50 rounded px-2 py-1 text-xs text-foreground outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-bold text-foreground">{loan.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(loan.principal)}</p>
+                      </>
+                    )}
+                  </div>
+                  
+                  {isEditing ? (
                     <button
                       onClick={() => handleEditSave(loan.id)}
-                      className="w-full bg-primary text-primary-foreground text-xs font-bold py-1 rounded hover:opacity-90"
+                      className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-bold hover:opacity-90 shrink-0"
                     >
                       Save
                     </button>
+                  ) : (
+                    <button
+                      onClick={() => handleEditStart(loan.id)}
+                      className="p-1 hover:bg-primary/20 rounded transition-colors shrink-0"
+                      title="Edit loan details"
+                    >
+                      <Pencil className="w-4 h-4 text-primary" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Display Mode: Details Grid */}
+                {!isEditing && (
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Outstanding</span>
+                      <p className={cn("font-bold", loan.outstanding < 0 ? "text-destructive" : "text-destructive")}>{formatCurrency(loan.outstanding)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">EMI/Month</span>
+                      <p className="text-primary font-bold">{formatCurrency(loan.emiAmount)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Next EMI</span>
+                      <p className="text-sm">{loan.nextEmiDate ? format(new Date(loan.nextEmiDate), "d MMM") : "-"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Remaining</span>
+                      <p className="text-sm">{loan.emiCount - loan.paidCount} months</p>
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="font-bold text-foreground">{loan.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(loan.principal)}</p>
+                )}
+
+                {/* Edit Mode: All Fields */}
+                {isEditing && (
+                  <div className="space-y-3 border-t border-white/10 pt-3">
+                    {/* Principal Amount */}
+                    <div>
+                      <label className="text-xs text-muted-foreground">Principal Amount</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm">₹</span>
+                        <input
+                          type="number"
+                          value={editPrincipal}
+                          onChange={(e) => setEditPrincipal(e.target.value)}
+                          className="flex-1 bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none"
+                        />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-muted-foreground">Outstanding</span>
-                        <p className={cn("font-bold", loan.outstanding < 0 ? "text-destructive" : "text-destructive")}>{formatCurrency(loan.outstanding)}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">EMI/Month</span>
-                        <p className="text-primary font-bold">{formatCurrency(loan.emiAmount)}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Next EMI</span>
-                        <p className="text-sm">{loan.nextEmiDate ? format(new Date(loan.nextEmiDate), "d MMM") : "-"}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Remaining</span>
-                        <p className="text-sm">{loan.emiCount - loan.paidCount} months</p>
+
+                    {/* Outstanding Amount */}
+                    <div>
+                      <label className="text-xs text-muted-foreground">Outstanding Amount</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm">₹</span>
+                        <input
+                          type="number"
+                          value={editOutstanding}
+                          onChange={(e) => setEditOutstanding(e.target.value)}
+                          className="flex-1 bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none"
+                        />
                       </div>
                     </div>
-                  </>
+
+                    {/* EMI Amount */}
+                    <div>
+                      <label className="text-xs text-muted-foreground">EMI Amount (Monthly)</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm">₹</span>
+                        <input
+                          type="number"
+                          value={editEMI}
+                          onChange={(e) => setEditEMI(e.target.value)}
+                          className="flex-1 bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Remaining Months */}
+                    <div>
+                      <label className="text-xs text-muted-foreground">Remaining Months</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editRemainingMonths}
+                        onChange={(e) => setEditRemainingMonths(e.target.value)}
+                        className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none mt-1"
+                      />
+                    </div>
+
+                    {/* Next EMI Date */}
+                    <div>
+                      <label className="text-xs text-muted-foreground">Next EMI Date</label>
+                      <input
+                        type="date"
+                        value={editNextEmiDate}
+                        onChange={(e) => setEditNextEmiDate(e.target.value)}
+                        className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none mt-1"
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             );
