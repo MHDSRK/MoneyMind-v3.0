@@ -161,6 +161,9 @@ function Section({ label, total, children, onAddNew }: SectionProps) {
 export function LiabilitiesTab() {
   const { store, updateStore } = useStore();
 
+  // Define the order and list of all groups to display
+  const GROUPS = ["Chitty", "Regular Expenses", "Borrow", "Others"];
+
   const handleLiabilityUpdate = (id: string, newAmount: number) => {
     updateStore((prev) => ({
       ...prev,
@@ -197,7 +200,12 @@ export function LiabilitiesTab() {
     return acc;
   }, {} as Record<string, LiabilityItem[]>);
 
-  // Calculate totals
+  // Calculate totals for each group
+  const getGroupTotal = (groupName: string) => {
+    return (groupedLiabilities[groupName] || []).reduce((sum, item) => sum + item.amount, 0);
+  };
+
+  // Calculate total liabilities
   const totalLiabilities = visibleLiabilities.reduce((sum, l) => sum + l.amount, 0);
 
   return (
@@ -211,31 +219,39 @@ export function LiabilitiesTab() {
 
       {visibleLiabilities.length === 0 ? (
         <div className="glass-card p-8 text-center text-muted-foreground italic text-sm">
-          No liabilities yet.
+          No liabilities yet. Click ADD NEW in any group to add items.
         </div>
-      ) : (
-        <div className="space-y-3">
-          {Object.entries(groupedLiabilities).map(([group, items]) => {
-            const groupTotal = items.reduce((sum, item) => sum + item.amount, 0);
-            return (
-              <Section 
-                key={group}
-                label={group} 
-                total={groupTotal}
-                onAddNew={() => handleAddLiability(group)}
-              >
-                {items.map((item) => (
+      ) : null}
+
+      <div className="space-y-3">
+        {GROUPS.map((group) => {
+          const items = groupedLiabilities[group] || [];
+          const groupTotal = getGroupTotal(group);
+          
+          return (
+            <Section 
+              key={group}
+              label={group} 
+              total={groupTotal}
+              onAddNew={() => handleAddLiability(group)}
+            >
+              {items.length === 0 ? (
+                <div className="text-xs text-muted-foreground italic py-2">
+                  No items yet
+                </div>
+              ) : (
+                items.map((item) => (
                   <LiabilityRow
                     key={item.id}
                     item={item}
                     onChange={(val) => handleLiabilityUpdate(item.id, val)}
                   />
-                ))}
-              </Section>
-            );
-          })}
-        </div>
-      )}
+                ))
+              )}
+            </Section>
+          );
+        })}
+      </div>
     </div>
   );
 }

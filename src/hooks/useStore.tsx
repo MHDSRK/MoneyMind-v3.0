@@ -232,13 +232,6 @@ const INITIAL_DATA: Store = {
     },
   ],
   liabilities: [
-    { id: "cc-sbi-octane", group: "Credit Cards", name: "SBI octane", amount: 0, dueDate: "" },
-    { id: "cc-hdfc-money-back", group: "Credit Cards", name: "HDFC Money Back", amount: 0, dueDate: "" },
-    { id: "cc-axis-neo", group: "Credit Cards", name: "AXIS Neo", amount: 0, dueDate: "" },
-    { id: "cc-axis-my-zone", group: "Credit Cards", name: "AXIS My Zone", amount: 0, dueDate: "" },
-    { id: "loan-cred-1", group: "Loan & EMI", name: "Cred Personal Loan 1", amount: 0, dueDate: "" },
-    { id: "loan-cred-2", group: "Loan & EMI", name: "Cred Personal Loan 2", amount: 0, dueDate: "" },
-    { id: "loan-bajaj", group: "Loan & EMI", name: "Bajaj Loan EMI", amount: 0, dueDate: "" },
     { id: "chitty-local", group: "Chitty", name: "Local Chitty", amount: 0, dueDate: "" },
     { id: "chitty-bank", group: "Chitty", name: "Bank Chitty", amount: 0, dueDate: "" },
     { id: "home-expense", group: "Regular Expenses", name: "Home Expense", amount: 0, dueDate: "" },
