@@ -17,11 +17,14 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Enable pnpm via corepack
+        run: corepack enable pnpm
+
       - name: Install dependencies
-        run: npx pnpm@10.30.3 install --frozen-lockfile --no-optional
+        run: pnpm install --frozen-lockfile --no-optional
 
       - name: Type check
-        run: npx pnpm@10.30.3 typecheck
+        run: pnpm typecheck
 
   build:
     name: Production Build
@@ -33,11 +36,14 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Enable pnpm via corepack
+        run: corepack enable pnpm
+
       - name: Install dependencies
-        run: npx pnpm@10.30.3 install --frozen-lockfile --no-optional
+        run: pnpm install --frozen-lockfile --no-optional
 
       - name: Build
-        run: npx pnpm@10.30.3 build
+        run: pnpm build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
@@ -56,14 +62,17 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Enable pnpm via corepack
+        run: corepack enable pnpm
+
       - name: Install dependencies
-        run: npx pnpm@10.30.3 install --frozen-lockfile --no-optional
+        run: pnpm install --frozen-lockfile --no-optional
 
       - name: Run tests
-        run: npx pnpm@10.30.3 test -- --run
+        run: pnpm test -- --run
 
       - name: Generate coverage report
-        run: npx pnpm@10.30.3 test:coverage -- --run
+        run: pnpm test:coverage -- --run
         continue-on-error: true
 
   # Linting job - placeholder for when ESLint is configured
