@@ -1237,55 +1237,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
           )}
         </div>
 
-        {/* ── EDIT AND ADD section ────────────────────────────────────────────── */}
-        <div>
-          <button
-            onClick={() => setEditOpen((o) => !o)}
-            className="w-full flex items-center justify-between py-4 border-b border-white/5"
-          >
-            <div className="flex items-center gap-3">
-              <Pencil className="w-4 h-4 text-primary" />
-              <span className="font-bold text-sm uppercase tracking-wider text-foreground">Edit & Add</span>
-            </div>
-            {editOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-          </button>
 
-          {editOpen && (
-            <div className="py-2 pl-7 space-y-0.5">
-              {/* Accounts */}
-              <button 
-                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "accounts" as const, label: "Accounts" })}
-                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
-                Accounts
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-
-              {/* Credit Cards */}
-              <button 
-                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "credit-cards" as const, label: "Credit Cards" })}
-                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
-                Credit Cards
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-
-              {/* Loans */}
-              <button 
-                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "loans" as const, label: "Loans" })}
-                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
-                Loans
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-
-              {/* Liabilities */}
-              <button 
-                onClick={() => setGroupScreen({ type: "asset" as const, groupKey: "liabilities" as const, label: "Liabilities" })}
-                className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between">
-                Liabilities
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

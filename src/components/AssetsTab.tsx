@@ -1,16 +1,22 @@
 import { formatCurrency } from "@/lib/utils";
 import { useStore, Account } from "@/hooks/useStore";
 import { useState, useEffect, useRef } from "react";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { format } from "date-fns";
 
-function AccountRow({ account, onChange }: { account: Account; onChange: (val: number) => void }) {
+function AccountRow({ account, onChange, onDelete }: { account: Account; onChange: (val: number) => void; onDelete?: () => void }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isNameEditing, setIsNameEditing] = useState(false);
   const [val, setVal] = useState(account.balance.toString());
+  const [nameVal, setNameVal] = useState(account.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<NodeJS.Timeout>();
 
   useEffect(() => { setVal(account.balance.toString()); }, [account.balance]);
+  useEffect(() => { setNameVal(account.name); }, [account.name]);
   useEffect(() => { if (isEditing && inputRef.current) inputRef.current.focus(); }, [isEditing]);
+  useEffect(() => { if (isNameEditing && nameInputRef.current) nameInputRef.current.focus(); }, [isNameEditing]);
 
   const handleBlur = () => {
     setIsEditing(false);
@@ -19,9 +25,45 @@ function AccountRow({ account, onChange }: { account: Account; onChange: (val: n
     else setVal(account.balance.toString());
   };
 
+  const handleNameBlur = () => {
+    setIsNameEditing(false);
+    // Could add name update here if needed
+  };
+
+  const handleAmountClick = () => {
+    setIsEditing(true);
+    if (val === "0") setVal("");
+  };
+
+  const handleLongPress = () => {
+    longPressTimer.current = setTimeout(() => {
+      setIsNameEditing(true);
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
   return (
     <div className="flex justify-between items-center py-3 border-b border-white/5 last:border-0">
-      <span className="font-medium text-sm">{account.name}</span>
+      {isNameEditing ? (
+        <input ref={nameInputRef} type="text" value={nameVal}
+          onChange={(e) => setNameVal(e.target.value)} onBlur={handleNameBlur}
+          onKeyDown={(e) => e.key === "Enter" && handleNameBlur()}
+          className="bg-transparent border-b border-primary text-sm outline-none text-foreground font-medium" />
+      ) : (
+        <span 
+          className="font-medium text-sm cursor-pointer select-none hover:text-primary transition-colors"
+          onMouseDown={handleLongPress}
+          onMouseUp={handleLongPressEnd}
+          onMouseLeave={handleLongPressEnd}
+          onTouchStart={handleLongPress}
+          onTouchEnd={handleLongPressEnd}
+        >
+          {account.name}
+        </span>
+      )}
       {isEditing ? (
         <div className="flex items-center text-primary">
           <span className="mr-1 text-sm">₹</span>
@@ -31,7 +73,10 @@ function AccountRow({ account, onChange }: { account: Account; onChange: (val: n
             className="bg-transparent border-b border-primary w-28 text-right outline-none text-primary font-bold text-sm" />
         </div>
       ) : (
-        <div onClick={() => setIsEditing(true)} className="text-primary neon-text font-bold cursor-pointer text-sm">
+        <div 
+          onClick={handleAmountClick} 
+          className="text-primary neon-text font-bold cursor-pointer text-sm hover:opacity-80 transition-opacity"
+        >
           {formatCurrency(account.balance)}
         </div>
       )}
@@ -39,23 +84,58 @@ function AccountRow({ account, onChange }: { account: Account; onChange: (val: n
   );
 }
 
-
-
 interface GroupSectionProps {
   label: string;
   total: number;
   trackOnly?: boolean;
   children: React.ReactNode;
+  onAddNew?: () => void;
+  isEditable?: boolean;
 }
 
-function GroupSection({ label, total, trackOnly, children }: GroupSectionProps) {
+function GroupSection({ label, total, trackOnly, children, onAddNew, isEditable }: GroupSectionProps) {
   const [open, setOpen] = useState(false);
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+  const [titleVal, setTitleVal] = useState(label);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<NodeJS.Timeout>();
+
+  useEffect(() => { if (isTitleEditing && titleInputRef.current) titleInputRef.current.focus(); }, [isTitleEditing]);
+
+  const handleTitleBlur = () => {
+    setIsTitleEditing(false);
+  };
+
+  const handleLongPress = () => {
+    longPressTimer.current = setTimeout(() => {
+      setIsTitleEditing(true);
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
   return (
     <div>
       <button onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-1 py-2">
+        className="w-full flex items-center justify-between px-1 py-2"
+        onMouseDown={handleLongPress}
+        onMouseUp={handleLongPressEnd}
+        onMouseLeave={handleLongPressEnd}
+        onTouchStart={handleLongPress}
+        onTouchEnd={handleLongPressEnd}
+      >
         <div className="flex items-center gap-2">
-          <span className={`font-bold tracking-wider uppercase text-xs ${label === 'Lent' ? 'text-gray-400' : 'text-primary neon-text'}`}>{label}</span>
+          {isTitleEditing ? (
+            <input ref={titleInputRef} type="text" value={titleVal}
+              onChange={(e) => setTitleVal(e.target.value)} onBlur={handleTitleBlur}
+              onKeyDown={(e) => e.key === "Enter" && handleTitleBlur()}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-transparent border-b border-primary text-xs outline-none font-bold tracking-wider uppercase" />
+          ) : (
+            <span className={`font-bold tracking-wider uppercase text-xs ${label === 'Lent' ? 'text-gray-400' : 'text-primary neon-text'}`}>{label}</span>
+          )}
           {trackOnly && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground uppercase tracking-wide">tracking</span>
           )}
@@ -63,7 +143,19 @@ function GroupSection({ label, total, trackOnly, children }: GroupSectionProps) 
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
-      {open && <div className="glass-card px-4 pb-1 pt-1">{children}</div>}
+      {open && (
+        <div className="glass-card px-4 pb-3 pt-2">
+          {children}
+          {onAddNew && (
+            <button
+              onClick={onAddNew}
+              className="w-full mt-2 py-2 flex items-center justify-center gap-1.5 text-xs text-primary font-bold hover:bg-primary/10 rounded-lg transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> ADD NEW
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -77,6 +169,21 @@ export function AssetsTab() {
       accounts: prev.accounts.map((a) =>
         a.id === id ? { ...a, balance: newBalance } : a
       ),
+    }));
+  };
+
+  const handleAddAccount = (type: "cash" | "bank" | "business" | "investments" | "insurance" | "other") => {
+    updateStore((prev) => ({
+      ...prev,
+      accounts: [
+        ...prev.accounts,
+        {
+          id: crypto.randomUUID(),
+          name: "New Account",
+          type,
+          balance: 0,
+        },
+      ],
     }));
   };
 
@@ -103,35 +210,35 @@ export function AssetsTab() {
         </div>
       </div>
 
-      <GroupSection label="Bank & Cash" total={bankTotal}>
+      <GroupSection label="Bank & Cash" total={bankTotal} onAddNew={() => handleAddAccount("bank")}>
         {bankAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />
         ))}
       </GroupSection>
 
-      <GroupSection label="Business" total={businessTotal}>
+      <GroupSection label="Business" total={businessTotal} onAddNew={() => handleAddAccount("business")}>
         {businessAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />
         ))}
       </GroupSection>
 
-      <GroupSection label="Investments" total={investmentTotal}>
+      <GroupSection label="Investments" total={investmentTotal} onAddNew={() => handleAddAccount("investments")}>
         {investmentAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />
         ))}
       </GroupSection>
 
-      <GroupSection label="Insurance" total={insuranceTotal}>
+      <GroupSection label="Insurance" total={insuranceTotal} onAddNew={() => handleAddAccount("insurance")}>
         {insuranceAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />
         ))}
       </GroupSection>
 
-      <GroupSection label="Lent" total={otherTotal}>
+      <GroupSection label="Lent" total={otherTotal} onAddNew={() => handleAddAccount("other")}>
         {otherAccounts.map((acc) => (
           <AccountRow key={acc.id} account={acc}
             onChange={(val) => handleAccountUpdate(acc.id!, val)} />
