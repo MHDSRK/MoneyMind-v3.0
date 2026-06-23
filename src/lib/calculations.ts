@@ -70,7 +70,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
     .reduce((sum, a) => sum + a.balance, 0);
 
   const totalAssets =
-    cashBalance + bankBalance + businessBalance + investmentsBalance + insuranceBalance + otherAssetsBalance;
+    cashBalance + bankBalance + businessBalance + investmentsBalance + insuranceBalance;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Credit Card Metrics
