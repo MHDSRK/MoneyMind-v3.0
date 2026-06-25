@@ -22,3 +22,8 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Test output
+test-output.txt
+vitest-e2e.json
+coverage/

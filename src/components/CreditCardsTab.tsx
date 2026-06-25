@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { useStore, CreditCard, updateCreditCard, archiveRecord, restoreRecord } from "@/hooks/useStore";
+import { useStore, CreditCard, updateCreditCard, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency, cn } from "@/lib/utils";
 import { calculateMetrics } from "@/lib/calculations";
-import { ChevronUp, ChevronDown, Plus, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Pencil, History } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
 
 export function CreditCardsTab() {
   const { store, updateStore } = useStore();
@@ -20,8 +21,8 @@ export function CreditCardsTab() {
   const [editUnbilled, setEditUnbilled] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
   const [editNextDueDate, setEditNextDueDate] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [paymentSheetCardId, setPaymentSheetCardId] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -39,11 +40,6 @@ export function CreditCardsTab() {
       return;
     }
 
-    const shouldShowArchived = Boolean(target.archivedAt);
-    if (showArchived !== shouldShowArchived) {
-      setShowArchived(shouldShowArchived);
-    }
-
     setExpandedCardId(focusId);
     setEditingCardId(null);
     setHighlightedId(focusId);
@@ -57,7 +53,7 @@ export function CreditCardsTab() {
     });
 
     return () => window.clearTimeout(timeout);
-  }, [location, showArchived, store.creditCards]);
+  }, [location, store.creditCards]);
 
   const handleUnbilledUpdate = (cardId: string, newUnbilled: number) => {
     updateStore((prev) => updateCreditCard(prev, cardId, { unbilled: Math.max(0, newUnbilled) }));
@@ -131,18 +127,8 @@ export function CreditCardsTab() {
     toast({ title: "Card deleted", description: "The record was permanently deleted." });
   };
 
-  const handleRestoreCard = (cardId: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      creditCards: restoreRecord(prev.creditCards, cardId),
-    }));
-    toast({ title: "Card restored", description: "The card is active again." });
-  };
-
   const visibleCards = store.creditCards.filter(
-    (card) =>
-      !card.deleted &&
-      (showArchived ? Boolean(card.archivedAt) : !card.archivedAt)
+    (card) => !card.deleted && !card.archivedAt
   );
   const metrics = calculateMetrics(store);
   const totalLimit = metrics.creditCardTotalLimit;
@@ -162,13 +148,6 @@ export function CreditCardsTab() {
         >
           {formatCurrency(totalLimit - totalOutstanding - totalUnbilled)}
         </h2>
-        <button
-          type="button"
-          onClick={() => setShowArchived((value) => !value)}
-          className="text-xs text-primary underline mb-4"
-        >
-          {showArchived ? "Show Active" : "Show Archived"}
-        </button>
         <div className="flex w-full justify-between px-4 text-xs">
           <div className="flex flex-col items-center">
             <span className="text-muted-foreground uppercase mb-1">Credit Limit</span>
@@ -205,7 +184,7 @@ export function CreditCardsTab() {
                 ref={(element) => {
                   cardRefs.current[card.id] = element;
                 }}
-                className={cn("glass-card overflow-hidden", highlightedId === card.id && "ring-2 ring-primary/60")}
+                className={cn("glass-card overflow-hidden", highlightedId === card.id && "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]")}
               >
                 {/* Card Header */}
                 <div className="w-full text-left p-4 flex items-start justify-between hover:bg-white/5 transition-colors">
@@ -414,32 +393,20 @@ export function CreditCardsTab() {
                         </div>
 
                         <div className="border-t border-white/10 pt-3 flex items-center justify-end gap-2">
-                          {card.archivedAt ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleRestoreCard(card.id)}
-                                className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-                              >
-                                Restore
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleHardDeleteCard(card.id)}
-                                className="px-2 py-1 rounded text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleArchiveCard(card.id)}
-                              className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-                            >
-                              Archive
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setPaymentSheetCardId(card.id)}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border border-white/20 text-muted-foreground hover:bg-white/10 transition-colors"
+                          >
+                            <History className="w-3 h-3" /> History
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleArchiveCard(card.id)}
+                            className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+                          >
+                            Archive
+                          </button>
                         </div>
                       </>
                     )}
@@ -458,6 +425,21 @@ export function CreditCardsTab() {
       >
         <Plus className="w-4 h-4" /> ADD NEW CARD
       </button>
+
+      {paymentSheetCardId && (() => {
+        const card = store.creditCards.find((c) => c.id === paymentSheetCardId);
+        if (!card) return null;
+        return (
+          <PaymentHistorySheet
+            open
+            onClose={() => setPaymentSheetCardId(null)}
+            entityType="credit-card"
+            entityId={card.id}
+            entityName={card.name}
+            outstanding={card.outstanding}
+          />
+        );
+      })()}
     </div>
   );
 }

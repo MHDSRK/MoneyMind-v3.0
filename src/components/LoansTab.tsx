@@ -1,10 +1,11 @@
 import { formatCurrency, cn } from "@/lib/utils";
-import { useStore, updateLoan, archiveRecord, restoreRecord } from "@/hooks/useStore";
+import { useStore, updateLoan, archiveRecord } from "@/hooks/useStore";
 import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
 
 export function LoansTab() {
   const { store, updateStore } = useStore();
@@ -17,8 +18,8 @@ export function LoansTab() {
   const [editEMI, setEditEMI] = useState("");
   const [editRemainingMonths, setEditRemainingMonths] = useState("");
   const [editNextEmiDate, setEditNextEmiDate] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [paymentSheetLoanId, setPaymentSheetLoanId] = useState<string | null>(null);
   const loanRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -36,11 +37,6 @@ export function LoansTab() {
       return;
     }
 
-    const shouldShowArchived = Boolean(target.archivedAt);
-    if (showArchived !== shouldShowArchived) {
-      setShowArchived(shouldShowArchived);
-    }
-
     setEditingLoanId(null);
     setHighlightedId(focusId);
 
@@ -53,7 +49,7 @@ export function LoansTab() {
     });
 
     return () => window.clearTimeout(timeout);
-  }, [location, showArchived, store.loans]);
+  }, [location, store.loans]);
 
   const handleAddLoan = () => {
     updateStore((prev) => ({
@@ -123,18 +119,8 @@ export function LoansTab() {
     toast({ title: "Loan deleted", description: "The record was permanently deleted." });
   };
 
-  const handleRestoreLoan = (loanId: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      loans: restoreRecord(prev.loans, loanId),
-    }));
-    toast({ title: "Loan restored", description: "The loan is active again." });
-  };
-
   const visibleLoans = store.loans.filter(
-    (loan) =>
-      !loan.deleted &&
-      (showArchived ? Boolean(loan.archivedAt) : !loan.archivedAt)
+    (loan) => !loan.deleted && !loan.archivedAt
   );
   const totalOutstanding = visibleLoans.reduce((sum, l) => sum + l.outstanding, 0);
   const totalEmiPerMonth = visibleLoans.reduce((sum, l) => sum + l.emiAmount, 0);
@@ -150,13 +136,6 @@ export function LoansTab() {
         )}>
           {formatCurrency(totalOutstanding)}
         </h2>
-        <button
-          type="button"
-          onClick={() => setShowArchived((value) => !value)}
-          className="text-xs text-primary underline mb-4"
-        >
-          {showArchived ? "Show Active" : "Show Archived"}
-        </button>
         <div className="flex w-full justify-between px-4">
           <div className="flex flex-col items-center">
             <span className="text-muted-foreground text-xs uppercase mb-1">Monthly EMI</span>
@@ -186,7 +165,7 @@ export function LoansTab() {
                 ref={(element) => {
                   loanRefs.current[loan.id] = element;
                 }}
-                className={cn("glass-card p-4 space-y-3", highlightedId === loan.id && "ring-2 ring-primary/60")}
+                className={cn("glass-card p-4 space-y-3", highlightedId === loan.id && "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]")}
               >
                 {/* Header with Edit Button */}
                 <div className="flex items-start justify-between gap-2">
@@ -328,32 +307,20 @@ export function LoansTab() {
 
                 {!isEditing && (
                   <div className="border-t border-white/10 pt-3 flex items-center justify-end gap-2">
-                    {loan.archivedAt ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreLoan(loan.id)}
-                          className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-                        >
-                          Restore
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleHardDeleteLoan(loan.id)}
-                          className="px-2 py-1 rounded text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveLoan(loan.id)}
-                        className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-                      >
-                        Archive
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPaymentSheetLoanId(loan.id)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border border-white/20 text-muted-foreground hover:bg-white/10 transition-colors"
+                    >
+                      <History className="w-3 h-3" /> History
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleArchiveLoan(loan.id)}
+                      className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+                    >
+                      Archive
+                    </button>
                   </div>
                 )}
               </div>
@@ -369,6 +336,22 @@ export function LoansTab() {
       >
         <Plus className="w-4 h-4" /> ADD NEW LOAN
       </button>
+
+      {paymentSheetLoanId && (() => {
+        const loan = store.loans.find((l) => l.id === paymentSheetLoanId);
+        if (!loan) return null;
+        return (
+          <PaymentHistorySheet
+            open
+            onClose={() => setPaymentSheetLoanId(null)}
+            entityType="loan"
+            entityId={loan.id}
+            entityName={loan.name}
+            outstanding={loan.outstanding}
+            defaultAmount={loan.emiAmount}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -7,9 +7,10 @@ import { LiabilitiesTab } from "@/components/LiabilitiesTab";
 import { CreditCardsTab } from "@/components/CreditCardsTab";
 import { LoansTab } from "@/components/LoansTab";
 import ArchivedTab from "@/components/ArchivedTab";
+import { CashFlowTab } from "@/components/CashFlowTab";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import NotFound from "@/pages/not-found";
-import { Home, Calendar, WalletCards, CreditCard, Landmark, HandCoins } from "lucide-react";
+import { Home, Calendar, WalletCards, CreditCard, Landmark, HandCoins, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -24,6 +25,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   "/cards": CreditCardsTab,
   "/loans": LoansTab,
   "/others": LiabilitiesTab,
+  "/cashflow": CashFlowTab,
   "/archived": ArchivedTab,
 };
 
@@ -69,6 +71,8 @@ function App() {
             isActive={location === "/loans"} onClick={() => setLocation("/loans")} />
           <NavButton icon={<HandCoins className="w-5 h-6" />} label="More"
             isActive={location === "/others"} onClick={() => setLocation("/others")} />
+          <NavButton icon={<TrendingUp className="w-5 h-5" />} label="Flow"
+            isActive={location === "/cashflow"} onClick={() => setLocation("/cashflow")} />
         </div>
       </nav>
 

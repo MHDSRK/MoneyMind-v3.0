@@ -13,6 +13,14 @@ import {
 } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 
+function sortByArchivedDate<T extends { archivedAt?: string }>(items: T[]) {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.archivedAt ?? 0).getTime() -
+      new Date(a.archivedAt ?? 0).getTime()
+  );
+}
+
 type ArchivedGroupProps = {
   title: string;
   icon: React.ReactNode;
@@ -44,6 +52,7 @@ function ArchivedGroup({
 
 type ArchivedRowProps = {
   title: string;
+  subtitle?: string;
   amount: number;
   archivedAt?: string;
   onRestore: () => void;
@@ -51,6 +60,7 @@ type ArchivedRowProps = {
 
 function ArchivedRow({
   title,
+  subtitle,
   amount,
   archivedAt,
   onRestore,
@@ -64,6 +74,11 @@ function ArchivedRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-white">{title}</p>
+          {subtitle && (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {subtitle}
+            </p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
             Archived on {archivedDate}
           </p>
@@ -91,32 +106,40 @@ export default function ArchivedTab() {
 
   const archivedAccounts = useMemo(
     () =>
-      store.accounts.filter(
-        (item) => !item.deleted && Boolean(item.archivedAt)
+      sortByArchivedDate(
+        store.accounts.filter(
+          (item) => !item.deleted && Boolean(item.archivedAt)
+        )
       ),
     [store.accounts]
   );
 
   const archivedCards = useMemo(
     () =>
-      store.creditCards.filter(
-        (item) => !item.deleted && Boolean(item.archivedAt)
+      sortByArchivedDate(
+        store.creditCards.filter(
+          (item) => !item.deleted && Boolean(item.archivedAt)
+        )
       ),
     [store.creditCards]
   );
 
   const archivedLoans = useMemo(
     () =>
-      store.loans.filter(
-        (item) => !item.deleted && Boolean(item.archivedAt)
+      sortByArchivedDate(
+        store.loans.filter(
+          (item) => !item.deleted && Boolean(item.archivedAt)
+        )
       ),
     [store.loans]
   );
 
   const archivedLiabilities = useMemo(
     () =>
-      store.liabilities.filter(
-        (item) => !item.deleted && Boolean(item.archivedAt)
+      sortByArchivedDate(
+        store.liabilities.filter(
+          (item) => !item.deleted && Boolean(item.archivedAt)
+        )
       ),
     [store.liabilities]
   );
@@ -201,6 +224,7 @@ export default function ArchivedTab() {
               <ArchivedRow
                 key={account.id}
                 title={account.name}
+                subtitle={account.type}
                 amount={account.balance}
                 archivedAt={account.archivedAt}
                 onRestore={() => restoreAccount(account.id)}
@@ -217,6 +241,7 @@ export default function ArchivedTab() {
               <ArchivedRow
                 key={card.id}
                 title={card.name}
+                subtitle={`${card.provider || "Credit Card"} • Limit ${formatCurrency(card.creditLimit)}`}
                 amount={card.outstanding}
                 archivedAt={card.archivedAt}
                 onRestore={() => restoreCard(card.id)}
@@ -233,6 +258,7 @@ export default function ArchivedTab() {
               <ArchivedRow
                 key={loan.id}
                 title={loan.name}
+                subtitle={loan.lender || "Loan"}
                 amount={loan.outstanding}
                 archivedAt={loan.archivedAt}
                 onRestore={() => restoreLoan(loan.id)}
@@ -249,6 +275,7 @@ export default function ArchivedTab() {
               <ArchivedRow
                 key={liability.id}
                 title={liability.name}
+                subtitle={liability.group || "Liability"}
                 amount={liability.amount}
                 archivedAt={liability.archivedAt}
                 onRestore={() => restoreLiability(liability.id)}

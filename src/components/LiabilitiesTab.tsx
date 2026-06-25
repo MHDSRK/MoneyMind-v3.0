@@ -1,21 +1,22 @@
 import { formatCurrency } from "@/lib/utils";
-import { useStore, LiabilityItem, updateLiability, archiveRecord, restoreRecord } from "@/hooks/useStore";
+import { useStore, LiabilityItem, updateLiability, archiveRecord } from "@/hooks/useStore";
 import { calculateMetrics } from "@/lib/calculations";
 import { useState, useRef, useEffect } from "react";
-import { ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
 
 interface LiabilityRowProps {
   item: LiabilityItem;
   onChange: (val: number) => void;
   onNameChange: (name: string) => void;
   onArchive: () => void;
-  onRestore: () => void;
+  onHistory: () => void;
   onDelete?: () => void;
 }
 
-function LiabilityRow({ item, onChange, onNameChange, onArchive, onRestore, onDelete }: LiabilityRowProps) {
+function LiabilityRow({ item, onChange, onNameChange, onArchive, onHistory, onDelete }: LiabilityRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [val, setVal] = useState(item.amount.toString());
@@ -75,6 +76,16 @@ function LiabilityRow({ item, onChange, onNameChange, onArchive, onRestore, onDe
           {item.name}
         </span>
       )}
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={onHistory}
+          className="mr-2 p-1 rounded hover:bg-white/10 transition-colors"
+          title="Payment history"
+        >
+          <History className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      )}
       {isEditing ? (
         <div className="flex items-center text-destructive">
           <span className="mr-1 text-sm">₹</span>
@@ -91,31 +102,12 @@ function LiabilityRow({ item, onChange, onNameChange, onArchive, onRestore, onDe
           >
             {formatCurrency(item.amount)}
           </div>
-          {item.archivedAt ? (
-            <button
-              type="button"
-              onClick={onRestore}
-              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-            >
-              Restore
-            </button>
-          ) : (
-            <button
+          <button
               onClick={onArchive}
               className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
             >
               Archive
             </button>
-          )}
-          {item.archivedAt && onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
-            >
-              Delete
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -202,7 +194,7 @@ function Section({ label, total, children, onAddNew, forceOpen }: SectionProps) 
 export function LiabilitiesTab() {
   const { store, updateStore } = useStore();
   const [location] = useLocation();
-  const [showArchived, setShowArchived] = useState(false);
+  const [paymentSheetItemId, setPaymentSheetItemId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [focusedGroup, setFocusedGroup] = useState<string | null>(null);
   const liabilityRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -257,18 +249,8 @@ export function LiabilitiesTab() {
     toast({ title: "Liability deleted", description: "The record was permanently deleted." });
   };
 
-  const handleRestoreLiability = (id: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      liabilities: restoreRecord(prev.liabilities, id),
-    }));
-    toast({ title: "Liability restored", description: "The liability is active again." });
-  };
-
   const visibleLiabilities = store.liabilities.filter(
-    (liability) =>
-      !liability.deleted &&
-      (showArchived ? Boolean(liability.archivedAt) : !liability.archivedAt)
+    (liability) => !liability.deleted && !liability.archivedAt
   );
   
   // Group liabilities by their group
@@ -303,11 +285,6 @@ export function LiabilitiesTab() {
       return;
     }
 
-    const shouldShowArchived = Boolean(target.archivedAt);
-    if (showArchived !== shouldShowArchived) {
-      setShowArchived(shouldShowArchived);
-    }
-
     setFocusedGroup(target.group);
     setHighlightedId(focusId);
 
@@ -320,23 +297,14 @@ export function LiabilitiesTab() {
     });
 
     return () => window.clearTimeout(timeout);
-  }, [location, showArchived, store.liabilities]);
+  }, [location, store.liabilities]);
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-2xl font-bold text-foreground">More</h2>
-        <div className="flex flex-col items-end gap-1">
-          <div className="text-2xl font-bold text-destructive">
-            {formatCurrency(totalLiabilities)}
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowArchived((value) => !value)}
-            className="text-xs text-primary underline"
-          >
-            {showArchived ? "Show Active" : "Show Archived"}
-          </button>
+        <div className="text-2xl font-bold text-destructive">
+          {formatCurrency(totalLiabilities)}
         </div>
       </div>
 
@@ -370,15 +338,14 @@ export function LiabilitiesTab() {
                     ref={(element) => {
                       liabilityRefs.current[item.id] = element;
                     }}
-                    className={highlightedId === item.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+                    className={highlightedId === item.id ? "rounded-lg ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
                   >
                     <LiabilityRow
                       item={item}
                       onChange={(val) => handleLiabilityUpdate(item.id, val)}
                       onNameChange={(name) => handleLiabilityNameUpdate(item.id, name)}
                       onArchive={() => handleArchiveLiability(item.id)}
-                      onRestore={() => handleRestoreLiability(item.id)}
-                      onDelete={showArchived ? () => handleHardDeleteLiability(item.id) : undefined}
+                      onHistory={() => setPaymentSheetItemId(item.id)}
                     />
                   </div>
                 ))
@@ -387,6 +354,21 @@ export function LiabilitiesTab() {
           );
         })}
       </div>
+
+      {paymentSheetItemId && (() => {
+        const item = store.liabilities.find((l) => l.id === paymentSheetItemId);
+        if (!item) return null;
+        return (
+          <PaymentHistorySheet
+            open
+            onClose={() => setPaymentSheetItemId(null)}
+            entityType="liability"
+            entityId={item.id}
+            entityName={item.name}
+            outstanding={item.amount}
+          />
+        );
+      })()}
     </div>
   );
 }

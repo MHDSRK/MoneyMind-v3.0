@@ -7,11 +7,14 @@ import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarCloc
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { parseISO, format, differenceInCalendarDays } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 type TransactionMode = "in" | "out" | "self";
 
 export function HomeTab() {
   const { store, updateStore } = useStore();
+  const [location] = useLocation();
+  const focusId = new URLSearchParams(location.split("?")[1] ?? "").get("focus");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionMode | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);

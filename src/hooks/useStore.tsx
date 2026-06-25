@@ -26,6 +26,8 @@ export interface Transaction {
   transferResolution?: "resolved" | "unresolved-legacy-name";
   notes: string;
   tags: string[];
+  relatedEntityType?: "loan" | "credit-card" | "liability";
+  relatedEntityId?: string;
   deleted?: boolean;
   archivedAt?: string;
   createdAt?: string;
