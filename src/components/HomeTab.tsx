@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { useStore, Transaction } from "@/hooks/useStore";
+import { useStore, Transaction, TransactionType } from "@/hooks/useStore";
 import { calculateMetrics } from "@/lib/calculations";
-import { Plus, ArrowDownToLine, ArrowUpFromLine, X, CalendarClock } from "lucide-react";
+import { createTransaction } from "@/lib/transactionEffects";
+import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { parseISO, format, differenceInCalendarDays } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+
+type TransactionMode = "in" | "out" | "self";
 
 export function HomeTab() {
   const { store, updateStore } = useStore();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [txType, setTxType] = useState<"in" | "out" | null>(null);
+  const [txType, setTxType] = useState<TransactionMode | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const [amount, setAmount] = useState("");
   const [ledger, setLedger] = useState("");
-  const [fromAccount, setFromAccount] = useState("");
-  const [toAccount, setToAccount] = useState("");
+  const [fromAccountId, setFromAccountId] = useState("");
+  const [toAccountId, setToAccountId] = useState("");
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -23,16 +27,7 @@ export function HomeTab() {
   const metrics = calculateMetrics(store);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const todaysTx = store.transactions.filter(
-    (t) => !t.deleted && t.date.startsWith(todayStr)
-  );
-  const todayIn = todaysTx
-    .filter((t) => t.type === "in")
-    .reduce((sum, t) => sum + t.amount, 0);
-  const todayOut = todaysTx
-    .filter((t) => t.type === "out")
-    .reduce((sum, t) => sum + t.amount, 0);
-  const todayNet = todayIn - todayOut;
+  const todayNet = metrics.todayIncome - metrics.todayExpense;
 
   // Upcoming credit card due dates
   const today = new Date();
@@ -64,98 +59,59 @@ export function HomeTab() {
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) return;
 
-    // Determine source/destination based on transaction type
-    let source = txType === "in" ? toAccount : fromAccount;
-    if (!source) source = ledger; // Use ledger as fallback
+    const isSelfTransfer = txType === "self";
+    const selectedFromAccountId = visibleAccounts.find((account) => account.id === fromAccountId)?.id;
+    const selectedToAccountId = visibleAccounts.find((account) => account.id === toAccountId)?.id;
+    const selectedFromCardId = visibleCreditCards.find((card) => card.id === fromAccountId)?.id;
+    const selectedToCardId = visibleCreditCards.find((card) => card.id === toAccountId)?.id;
+    const sourceAccount = visibleAccounts.find((account) => account.id === selectedFromAccountId);
+    const destinationAccount = visibleAccounts.find((account) => account.id === selectedToAccountId);
+    const sourceCard = visibleCreditCards.find((card) => card.id === selectedFromCardId);
+    const sourceName = txType === "out"
+      ? (sourceAccount?.name ?? sourceCard?.name ?? "")
+      : txType === "self"
+        ? (sourceAccount?.name ?? "")
+        : undefined;
+    const destinationName = txType === "in"
+      ? (destinationAccount?.name ?? "")
+      : txType === "self"
+        ? (destinationAccount?.name ?? "")
+        : undefined;
+    const ledgerLabel = isSelfTransfer
+      ? `Self transfer: ₹${amt} from ${sourceAccount?.name ?? ""} to ${destinationAccount?.name ?? ""}`
+      : ledger;
 
     const newTx: Transaction = {
       id: crypto.randomUUID(),
       date: todayStr,
-      type: txType,
+      type: isSelfTransfer ? "transfer" : txType,
       amount: amt,
-      fromAccount: txType === "out" ? source : undefined,
-      toAccount: txType === "in" ? source : undefined,
-      ledger,
-      category,
+      fromAccount: txType === "out" ? sourceName : txType === "self" ? sourceAccount?.name : undefined,
+      toAccount: txType === "in" ? destinationName : txType === "self" ? destinationAccount?.name : undefined,
+      fromAccountId: txType === "out" || txType === "self" ? sourceAccount?.id : undefined,
+      fromCardId: txType === "out" ? selectedFromCardId : undefined,
+      toAccountId: txType === "in" || txType === "self" ? destinationAccount?.id : undefined,
+      toCardId: txType === "in" ? selectedToCardId : undefined,
+      ledger: ledgerLabel,
+      category: txType === "self" ? "Self Transfer" : category,
       notes,
       tags: selectedTags,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    updateStore((prev) => {
-      let next = { ...prev, transactions: [...prev.transactions, newTx] };
-
-      // Update account balance if applicable
-      if (source && txType === "out") {
-        const account = next.accounts.find(
-          (a) => a.name === source && !a.deleted
-        );
-        if (account) {
-          next = {
-            ...next,
-            accounts: next.accounts.map((a) =>
-              a.id === account.id
-                ? { ...a, balance: a.balance - amt }
-                : a
-            ),
-          };
-        }
-      }
-
-      if (source && txType === "in") {
-        const account = next.accounts.find(
-          (a) => a.name === source && !a.deleted
-        );
-        if (account) {
-          next = {
-            ...next,
-            accounts: next.accounts.map((a) =>
-              a.id === account.id
-                ? { ...a, balance: a.balance + amt }
-                : a
-            ),
-          };
-        }
-      }
-
-      // Update credit card outstanding/unbilled if transaction is on a credit card
-      if (txType === "out") {
-        const creditCard = next.creditCards.find(
-          (cc) => cc.name === source && !cc.deleted
-        );
-        if (creditCard) {
-          // Determine if this should go to unbilled or outstanding
-          const today = new Date();
-          const currentDate = today.getDate();
-          const statementDate = creditCard.statementDate || 1;
-          const isUnbilled = currentDate >= statementDate;
-          
-          next = {
-            ...next,
-            creditCards: next.creditCards.map((cc) =>
-              cc.id === creditCard.id
-                ? {
-                    ...cc,
-                    outstanding: cc.outstanding + (isUnbilled ? 0 : amt),
-                    unbilled: (cc.unbilled || 0) + (isUnbilled ? amt : 0),
-                  }
-                : cc
-            ),
-          };
-        }
-      }
-
-      return next;
-    });
+    updateStore((prev) => createTransaction(prev, newTx));
 
     setAmount("");
     setLedger("");
-    setFromAccount("");
-    setToAccount("");
+    setFromAccountId("");
+    setToAccountId("");
     setCategory("");
     setNotes("");
     setSelectedTags([]);
     setTxType(null);
     setSheetOpen(false);
+    toast({ title: "Transaction saved", description: "Your update was recorded instantly." });
   };
 
   const handleClose = () => {
@@ -163,15 +119,15 @@ export function HomeTab() {
     setTxType(null);
     setAmount("");
     setLedger("");
-    setFromAccount("");
-    setToAccount("");
+    setFromAccountId("");
+    setToAccountId("");
     setCategory("");
     setNotes("");
     setSelectedTags([]);
   };
 
-  const visibleAccounts = store.accounts.filter((a) => !a.deleted);
-  const visibleCreditCards = store.creditCards.filter((c) => !c.deleted);
+  const visibleAccounts = store.accounts.filter((a) => !a.deleted && !a.archivedAt);
+  const visibleCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
   const moneyInCategories = store.categories
     .filter((c) => c.type === "in" && !c.deleted)
     .map((c) => c.name);
@@ -181,16 +137,21 @@ export function HomeTab() {
 
   const moneyInSelect = (
     <select
-      value={toAccount}
-      onChange={(e) => setToAccount(e.target.value)}
+      value={toAccountId}
+      onChange={(e) => setToAccountId(e.target.value)}
       className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
     >
       <option value="" disabled>
-        Select Account
+        Select Account or Card
       </option>
       {visibleAccounts.map((a) => (
-        <option key={a.id} value={a.name}>
+        <option key={a.id} value={a.id}>
           {a.name}
+        </option>
+      ))}
+      {visibleCreditCards.map((c) => (
+        <option key={c.id} value={c.id}>
+          💳 {c.name}
         </option>
       ))}
     </select>
@@ -198,20 +159,20 @@ export function HomeTab() {
 
   const moneyOutSelect = (
     <select
-      value={fromAccount}
-      onChange={(e) => setFromAccount(e.target.value)}
+      value={fromAccountId}
+      onChange={(e) => setFromAccountId(e.target.value)}
       className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
     >
       <option value="" disabled>
         Select Account or Card
       </option>
       {visibleAccounts.map((a) => (
-        <option key={a.id} value={a.name}>
+        <option key={a.id} value={a.id}>
           {a.name}
         </option>
       ))}
       {visibleCreditCards.map((c) => (
-        <option key={c.id} value={c.name}>
+        <option key={c.id} value={c.id}>
           💳 {c.name}
         </option>
       ))}
@@ -366,20 +327,26 @@ export function HomeTab() {
           </div>
 
           {!txType ? (
-            <div className="flex gap-3 px-5 pt-5">
+            <div className="flex gap-2 px-5 pt-5 flex-wrap">
               <button
                 onClick={() => setTxType("in")}
                 data-testid="button-money-in"
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#34d399]/10 border border-[#34d399]/20 text-[#34d399] font-bold text-sm hover:bg-[#34d399]/20 active:scale-95 transition-all"
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-[#34d399]/10 border border-[#34d399]/20 text-[#34d399] font-bold text-sm hover:bg-[#34d399]/20 active:scale-95 transition-all"
               >
                 <ArrowDownToLine className="w-4 h-4" /> Money In
               </button>
               <button
                 onClick={() => setTxType("out")}
                 data-testid="button-money-out"
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm hover:bg-destructive/20 active:scale-95 transition-all"
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm hover:bg-destructive/20 active:scale-95 transition-all"
               >
                 <ArrowUpFromLine className="w-4 h-4" /> Money Out
+              </button>
+              <button
+                onClick={() => setTxType("self")}
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-sm hover:bg-primary/20 active:scale-95 transition-all"
+              >
+                <ArrowLeftRight className="w-4 h-4" /> Self
               </button>
             </div>
           ) : (
@@ -413,6 +380,41 @@ export function HomeTab() {
                     </label>
                     {moneyOutSelect}
                   </div>
+                )}
+
+                {txType === "self" && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
+                        From Account
+                      </label>
+                      <select
+                        value={fromAccountId}
+                        onChange={(e) => setFromAccountId(e.target.value)}
+                        className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
+                      >
+                        <option value="" disabled>Select Source Account</option>
+                        {visibleAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">
+                        To Account
+                      </label>
+                      <select
+                        value={toAccountId}
+                        onChange={(e) => setToAccountId(e.target.value)}
+                        className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
+                      >
+                        <option value="" disabled>Select Destination Account</option>
+                        {visibleAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
                 )}
 
                 <div className="space-y-1">
@@ -457,7 +459,7 @@ export function HomeTab() {
               <div className="pt-2 pb-4">
                 <button
                   onClick={handleSave}
-                  disabled={!amount || !ledger || !category}
+                  disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))}
                   data-testid="button-save-transaction"
                   className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition-all active:scale-[0.98]"
                 >

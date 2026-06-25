@@ -7,6 +7,17 @@ export function TodayTab() {
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const todaysTx = store.transactions.filter((t) => !t.deleted && t.date.startsWith(todayStr));
 
+  const getAccountName = (
+    accountId?: string,
+    legacyAccountName?: string
+  ) => {
+    return (
+      store.accounts.find((account) => account.id === accountId)?.name ??
+      legacyAccountName ??
+      "Unknown account"
+    );
+  };
+
   const todayIn = todaysTx.filter((t) => t.type === "in").reduce((sum, t) => sum + t.amount, 0);
   const todayOut = todaysTx.filter((t) => t.type === "out").reduce((sum, t) => sum + t.amount, 0);
   const todayNet = todayIn - todayOut;
@@ -35,16 +46,32 @@ export function TodayTab() {
             {todaysTx.map((tx) => (
               <div key={tx.id} className="flex items-center px-4 py-3">
                 <div className="flex-1 flex flex-col min-w-0 pr-2">
-                  <span className="font-medium text-sm truncate">{tx.ledger}</span>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {tx.type === "in" ? tx.toAccount : tx.fromAccount || tx.ledger}
-                  </span>
+                  <p className="truncate text-sm font-semibold text-white">
+                    {tx.type === "transfer"
+                      ? `Self Transfer : ${formatCurrency(tx.amount)}`
+                      : tx.ledger || tx.category || "Transaction"}
+                  </p>
+
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {tx.type === "transfer"
+                      ? `From ${getAccountName(
+                          tx.fromAccountId,
+                          tx.fromAccount
+                        )} to ${getAccountName(tx.toAccountId, tx.toAccount)}`
+                      : tx.notes ||
+                        tx.account ||
+                        tx.fromAccount ||
+                        tx.toAccount ||
+                        ""}
+                  </p>
                 </div>
-                <div className="w-24 text-right text-[#34d399] font-medium text-sm">
-                  {tx.type === "in" ? formatCurrency(tx.amount) : ""}
+
+                <div className="w-24 text-right text-emerald-400 font-medium text-sm">
+                  {tx.type === "in" ? formatCurrency(tx.amount) : "₹0.00"}
                 </div>
-                <div className="w-24 text-right text-destructive font-medium text-sm">
-                  {tx.type === "out" ? formatCurrency(tx.amount) : ""}
+
+                <div className="w-24 text-right text-red-400 font-medium text-sm">
+                  {tx.type === "out" ? formatCurrency(tx.amount) : "₹0.00"}
                 </div>
               </div>
             ))}

@@ -1,10 +1,19 @@
 import { formatCurrency } from "@/lib/utils";
-import { useStore, Account } from "@/hooks/useStore";
+import { useStore, Account, updateAccount, archiveRecord, restoreRecord } from "@/hooks/useStore";
 import { useState, useEffect, useRef } from "react";
 import { ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
-function AccountRow({ account, onChange, onNameChange, onDelete }: { account: Account; onChange: (val: number) => void; onNameChange?: (name: string) => void; onDelete?: () => void }) {
+function AccountRow({ account, onChange, onNameChange, onArchive, onRestore, onDelete }: {
+  account: Account;
+  onChange: (val: number) => void;
+  onNameChange?: (name: string) => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
+  onDelete?: () => void;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [val, setVal] = useState(account.balance.toString());
@@ -77,11 +86,40 @@ function AccountRow({ account, onChange, onNameChange, onDelete }: { account: Ac
             className="bg-transparent border-b border-primary w-28 text-right outline-none text-primary font-bold text-sm" />
         </div>
       ) : (
-        <div 
-          onClick={handleAmountClick} 
-          className="text-primary neon-text font-bold cursor-pointer text-sm hover:opacity-80 transition-opacity"
-        >
-          {formatCurrency(account.balance)}
+        <div className="flex items-center gap-2">
+          <div
+            onClick={handleAmountClick}
+            className="text-primary neon-text font-bold cursor-pointer text-sm hover:opacity-80 transition-opacity"
+          >
+            {formatCurrency(account.balance)}
+          </div>
+          {account.archivedAt ? (
+            <button
+              type="button"
+              onClick={onRestore}
+              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+            >
+              Restore
+            </button>
+          ) : (
+            onArchive && (
+              <button
+                onClick={onArchive}
+                className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+              >
+                Archive
+              </button>
+            )
+          )}
+          {account.archivedAt && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
+            >
+              Delete
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -94,10 +132,17 @@ interface GroupSectionProps {
   trackOnly?: boolean;
   children: React.ReactNode;
   onAddNew?: () => void;
+  forceOpen?: boolean;
 }
 
-function GroupSection({ label, total, trackOnly, children, onAddNew }: GroupSectionProps) {
+function GroupSection({ label, total, trackOnly, children, onAddNew, forceOpen }: GroupSectionProps) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (forceOpen) {
+      setOpen(true);
+    }
+  }, [forceOpen]);
 
   return (
     <div>
@@ -132,23 +177,43 @@ function GroupSection({ label, total, trackOnly, children, onAddNew }: GroupSect
 
 export function AssetsTab() {
   const { store, updateStore } = useStore();
+  const [location] = useLocation();
+  const [showArchived, setShowArchived] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [focusedGroup, setFocusedGroup] = useState<string | null>(null);
+  const accountRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const handleAccountUpdate = (id: string, newBalance: number) => {
-    updateStore((prev) => ({
-      ...prev,
-      accounts: prev.accounts.map((a) =>
-        a.id === id ? { ...a, balance: newBalance } : a
-      ),
-    }));
+    updateStore((prev) => updateAccount(prev, id, { balance: newBalance }));
   };
 
   const handleAccountNameUpdate = (id: string, newName: string) => {
+    updateStore((prev) => updateAccount(prev, id, { name: newName }));
+  };
+
+  const handleArchiveAccount = (id: string) => {
     updateStore((prev) => ({
       ...prev,
-      accounts: prev.accounts.map((a) =>
-        a.id === id ? { ...a, name: newName } : a
-      ),
+      accounts: archiveRecord(prev.accounts, id),
     }));
+    toast({ title: "Account archived", description: "The account was archived and removed from active totals." });
+  };
+
+  const handleHardDeleteAccount = (id: string) => {
+    if (!window.confirm("Permanently delete this record? This cannot be undone.")) {
+      return;
+    }
+
+    updateStore((prev) => updateAccount(prev, id, { deleted: true }));
+    toast({ title: "Account deleted", description: "The record was permanently deleted." });
+  };
+
+  const handleRestoreAccount = (id: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      accounts: restoreRecord(prev.accounts, id),
+    }));
+    toast({ title: "Account restored", description: "The account is active again." });
   };
 
   const handleAddAccount = (type: "cash" | "bank" | "business" | "investments" | "insurance" | "other") => {
@@ -167,11 +232,36 @@ export function AssetsTab() {
   };
 
   // Filter accounts by type (not group field)
-  const bankAccounts = store.accounts.filter((a) => (a.type === "cash" || a.type === "bank") && !a.deleted);
-  const businessAccounts = store.accounts.filter((a) => a.type === "business" && !a.deleted);
-  const investmentAccounts = store.accounts.filter((a) => a.type === "investments" && !a.deleted);
-  const insuranceAccounts = store.accounts.filter((a) => a.type === "insurance" && !a.deleted);
-  const otherAccounts = store.accounts.filter((a) => a.type === "other" && !a.deleted);
+  const bankAccounts = store.accounts.filter(
+    (a) =>
+      (a.type === "cash" || a.type === "bank") &&
+      !a.deleted &&
+      (showArchived ? Boolean(a.archivedAt) : !a.archivedAt)
+  );
+  const businessAccounts = store.accounts.filter(
+    (a) =>
+      a.type === "business" &&
+      !a.deleted &&
+      (showArchived ? Boolean(a.archivedAt) : !a.archivedAt)
+  );
+  const investmentAccounts = store.accounts.filter(
+    (a) =>
+      a.type === "investments" &&
+      !a.deleted &&
+      (showArchived ? Boolean(a.archivedAt) : !a.archivedAt)
+  );
+  const insuranceAccounts = store.accounts.filter(
+    (a) =>
+      a.type === "insurance" &&
+      !a.deleted &&
+      (showArchived ? Boolean(a.archivedAt) : !a.archivedAt)
+  );
+  const otherAccounts = store.accounts.filter(
+    (a) =>
+      a.type === "other" &&
+      !a.deleted &&
+      (showArchived ? Boolean(a.archivedAt) : !a.archivedAt)
+  );
 
   const bankTotal = bankAccounts.reduce((sum, a) => sum + a.balance, 0);
   const businessTotal = businessAccounts.reduce((sum, a) => sum + a.balance, 0);
@@ -180,52 +270,193 @@ export function AssetsTab() {
   const otherTotal = otherAccounts.reduce((sum, a) => sum + a.balance, 0);
   const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
 
+  useEffect(() => {
+    if (!location.startsWith("/assets")) {
+      return;
+    }
+
+    const focusId = new URLSearchParams(window.location.search).get("focus");
+    if (!focusId) {
+      return;
+    }
+
+    const target = store.accounts.find(
+      (account) => account.id === focusId && !account.deleted
+    );
+
+    if (!target) {
+      return;
+    }
+
+    const shouldShowArchived = Boolean(target.archivedAt);
+    if (showArchived !== shouldShowArchived) {
+      setShowArchived(shouldShowArchived);
+    }
+
+    if (target.type === "cash" || target.type === "bank") {
+      setFocusedGroup("Bank & Cash");
+    } else if (target.type === "business") {
+      setFocusedGroup("Business");
+    } else if (target.type === "investments") {
+      setFocusedGroup("Investments");
+    } else if (target.type === "insurance") {
+      setFocusedGroup("Insurance");
+    } else {
+      setFocusedGroup("Lent");
+    }
+
+    setHighlightedId(focusId);
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedId((previous) => (previous === focusId ? null : previous));
+    }, 2500);
+
+    window.requestAnimationFrame(() => {
+      accountRefs.current[focusId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+
+    return () => window.clearTimeout(timeout);
+  }, [location, showArchived, store.accounts]);
+
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-2xl font-bold text-foreground">Assets</h2>
-        <div className={`text-2xl font-bold ${ totalAssets < 0 ? 'text-destructive' : 'text-primary neon-text'}`}>
-          {formatCurrency(totalAssets)}
+        <div className="flex flex-col items-end gap-1">
+          <div className={`text-2xl font-bold ${ totalAssets < 0 ? 'text-destructive' : 'text-primary neon-text'}`}>
+            {formatCurrency(totalAssets)}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowArchived((value) => !value)}
+            className="text-xs text-primary underline"
+          >
+            {showArchived ? "Show Active" : "Show Archived"}
+          </button>
         </div>
       </div>
 
-      <GroupSection label="Bank & Cash" total={bankTotal} onAddNew={() => handleAddAccount("bank")}>
+      <GroupSection
+        label="Bank & Cash"
+        total={bankTotal}
+        onAddNew={() => handleAddAccount("bank")}
+        forceOpen={focusedGroup === "Bank & Cash"}
+      >
         {bankAccounts.map((acc) => (
-          <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)}
-            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
+          <div
+            key={acc.id}
+            ref={(element) => {
+              accountRefs.current[acc.id] = element;
+            }}
+            className={highlightedId === acc.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+          >
+            <AccountRow account={acc}
+              onChange={(val) => handleAccountUpdate(acc.id!, val)}
+              onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)}
+              onArchive={() => handleArchiveAccount(acc.id!)}
+              onRestore={() => handleRestoreAccount(acc.id!)}
+              onDelete={showArchived ? () => handleHardDeleteAccount(acc.id!) : undefined} />
+          </div>
         ))}
       </GroupSection>
 
-      <GroupSection label="Business" total={businessTotal} onAddNew={() => handleAddAccount("business")}>
+      <GroupSection
+        label="Business"
+        total={businessTotal}
+        onAddNew={() => handleAddAccount("business")}
+        forceOpen={focusedGroup === "Business"}
+      >
         {businessAccounts.map((acc) => (
-          <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)}
-            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
+          <div
+            key={acc.id}
+            ref={(element) => {
+              accountRefs.current[acc.id] = element;
+            }}
+            className={highlightedId === acc.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+          >
+            <AccountRow account={acc}
+              onChange={(val) => handleAccountUpdate(acc.id!, val)}
+              onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)}
+              onArchive={() => handleArchiveAccount(acc.id!)}
+              onRestore={() => handleRestoreAccount(acc.id!)}
+              onDelete={showArchived ? () => handleHardDeleteAccount(acc.id!) : undefined} />
+          </div>
         ))}
       </GroupSection>
 
-      <GroupSection label="Investments" total={investmentTotal} onAddNew={() => handleAddAccount("investments")}>
+      <GroupSection
+        label="Investments"
+        total={investmentTotal}
+        onAddNew={() => handleAddAccount("investments")}
+        forceOpen={focusedGroup === "Investments"}
+      >
         {investmentAccounts.map((acc) => (
-          <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)}
-            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
+          <div
+            key={acc.id}
+            ref={(element) => {
+              accountRefs.current[acc.id] = element;
+            }}
+            className={highlightedId === acc.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+          >
+            <AccountRow account={acc}
+              onChange={(val) => handleAccountUpdate(acc.id!, val)}
+              onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)}
+              onArchive={() => handleArchiveAccount(acc.id!)}
+              onRestore={() => handleRestoreAccount(acc.id!)}
+              onDelete={showArchived ? () => handleHardDeleteAccount(acc.id!) : undefined} />
+          </div>
         ))}
       </GroupSection>
 
-      <GroupSection label="Insurance" total={insuranceTotal} onAddNew={() => handleAddAccount("insurance")}>
+      <GroupSection
+        label="Insurance"
+        total={insuranceTotal}
+        onAddNew={() => handleAddAccount("insurance")}
+        forceOpen={focusedGroup === "Insurance"}
+      >
         {insuranceAccounts.map((acc) => (
-          <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)}
-            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
+          <div
+            key={acc.id}
+            ref={(element) => {
+              accountRefs.current[acc.id] = element;
+            }}
+            className={highlightedId === acc.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+          >
+            <AccountRow account={acc}
+              onChange={(val) => handleAccountUpdate(acc.id!, val)}
+              onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)}
+              onArchive={() => handleArchiveAccount(acc.id!)}
+              onRestore={() => handleRestoreAccount(acc.id!)}
+              onDelete={showArchived ? () => handleHardDeleteAccount(acc.id!) : undefined} />
+          </div>
         ))}
       </GroupSection>
 
-      <GroupSection label="Lent" total={otherTotal} trackOnly onAddNew={() => handleAddAccount("other")}>
+      <GroupSection
+        label="Lent"
+        total={otherTotal}
+        trackOnly
+        onAddNew={() => handleAddAccount("other")}
+        forceOpen={focusedGroup === "Lent"}
+      >
         {otherAccounts.map((acc) => (
-          <AccountRow key={acc.id} account={acc}
-            onChange={(val) => handleAccountUpdate(acc.id!, val)}
-            onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)} />
+          <div
+            key={acc.id}
+            ref={(element) => {
+              accountRefs.current[acc.id] = element;
+            }}
+            className={highlightedId === acc.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+          >
+            <AccountRow account={acc}
+              onChange={(val) => handleAccountUpdate(acc.id!, val)}
+              onNameChange={(name) => handleAccountNameUpdate(acc.id!, name)}
+              onArchive={() => handleArchiveAccount(acc.id!)}
+              onRestore={() => handleRestoreAccount(acc.id!)}
+              onDelete={showArchived ? () => handleHardDeleteAccount(acc.id!) : undefined} />
+          </div>
         ))}
       </GroupSection>
     </div>

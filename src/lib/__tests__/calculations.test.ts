@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { calculateMetrics, FinancialMetrics } from "@/lib/calculations";
-import { Store } from "@/hooks/useStore";
+import {
+  calculateMetrics,
+  FinancialMetrics,
+  getAccountBalanceHistory,
+} from "@/lib/calculations";
+import {
+  createTransaction as applyTransaction,
+  updateTransaction,
+  deleteTransaction,
+} from "@/lib/transactionEffects";
+import { Store, normalizeStore } from "@/hooks/useStore";
 
 describe("Financial Calculations", () => {
   // Helper to create a minimal store with default values
@@ -41,17 +50,18 @@ describe("Financial Calculations", () => {
       expect(metrics.totalAssets).toBe(1000);
     });
 
-    it("should exclude Lent (other type) from total assets", () => {
+    it("should include other accounts in total assets and net worth", () => {
       const store = createStore({
         accounts: [
           { id: "1", name: "Bank", type: "bank", balance: 1000, deleted: false },
-          { id: "2", name: "Lent", type: "other", balance: 2000, deleted: false },
+          { id: "2", name: "Other", type: "other", balance: 300, deleted: false },
         ],
       });
 
       const metrics = calculateMetrics(store);
-      expect(metrics.totalAssets).toBe(1000);
-      expect(metrics.otherAssetsBalance).toBe(2000);
+      expect(metrics.otherAssetsBalance).toBe(300);
+      expect(metrics.totalAssets).toBe(1300);
+      expect(metrics.netWorth).toBe(1300);
     });
 
     it("should calculate balances by account type", () => {
@@ -94,6 +104,17 @@ describe("Financial Calculations", () => {
 
       const metrics = calculateMetrics(store);
       expect(metrics.totalAssets).toBe(500);
+    });
+
+    it("should normalize legacy investment accounts and count them as assets", () => {
+      const normalized = normalizeStore({
+        accounts: [{ id: "inv-1", name: "Growth Fund", type: "investment", balance: 2500, deleted: false }],
+      });
+
+      const metrics = calculateMetrics(normalized);
+      expect(normalized.accounts[0].type).toBe("investments");
+      expect(metrics.investmentsBalance).toBe(2500);
+      expect(metrics.totalAssets).toBe(2500);
     });
   });
 
@@ -154,8 +175,9 @@ describe("Financial Calculations", () => {
       });
 
       const metrics = calculateMetrics(store);
-      // Available = Total Limit - Outstanding (unbilled is included in outstanding)
-      expect(metrics.creditCardAvailableLimit).toBe(7000);
+      // Available = Total Limit - Outstanding - Unbilled
+      expect(metrics.creditCardUnbilled).toBe(2000);
+      expect(metrics.creditCardAvailableLimit).toBe(5000);
     });
 
     it("should sum all credit card outstanding amounts", () => {
@@ -389,7 +411,7 @@ describe("Financial Calculations", () => {
   });
 
   describe("Liability Calculations", () => {
-    it("should calculate total liabilities from credit cards and loans", () => {
+    it("should calculate total liabilities from credit cards, loans, and manual liabilities exactly once", () => {
       const store = createStore({
         creditCards: [
           {
@@ -422,10 +444,68 @@ describe("Financial Calculations", () => {
             deleted: false,
           },
         ],
+        liabilities: [
+          { id: "liab1", group: "Borrow", name: "Friend Loan", amount: 15000, dueDate: "2026-02-01", deleted: false },
+        ],
       });
 
       const metrics = calculateMetrics(store);
-      expect(metrics.totalLiabilities).toBe(85000);
+      expect(metrics.totalLiabilities).toBe(100000);
+    });
+
+    it("should count each debt source once without double counting", () => {
+      const store = createStore({
+        accounts: [{ id: "cash", name: "Cash", type: "cash", balance: 100000, deleted: false }],
+        creditCards: [
+          {
+            id: "cc1",
+            name: "Card1",
+            provider: "Bank A",
+            creditLimit: 10000,
+            outstanding: 10000,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+        loans: [
+          {
+            id: "loan1",
+            name: "Loan1",
+            lender: "Bank A",
+            principal: 100000,
+            interestRate: 7,
+            emiAmount: 1000,
+            emiFrequency: "monthly",
+            emiCount: 120,
+            paidCount: 20,
+            outstanding: 20000,
+            nextEmiDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+        liabilities: [
+          { id: "liab1", group: "Borrow", name: "Borrowing", amount: 30000, dueDate: "2026-02-01", deleted: false },
+          { id: "liab2", group: "More Liabilities", name: "Other debt", amount: 40000, dueDate: "2026-02-01", deleted: false },
+        ],
+      });
+
+      const metrics = calculateMetrics(store);
+      expect(metrics.totalLiabilities).toBe(100000);
+      expect(metrics.netWorth).toBe(0);
+    });
+
+    it("should add createdAt and updatedAt defaults to legacy records during normalization", () => {
+      const normalized = normalizeStore({
+        liabilities: [{ id: "liab1", group: "Borrow", name: "Friend Loan", amount: 15000, dueDate: "2026-02-01" }],
+        transactions: [{ id: "tx1", date: "2026-01-01", ledger: "Salary", amount: 1000, type: "in", category: "income", notes: "", tags: [] }],
+      });
+
+      expect(normalized.liabilities[0].createdAt).toBeDefined();
+      expect(normalized.liabilities[0].updatedAt).toBeDefined();
+      expect(normalized.transactions[0].createdAt).toBeDefined();
+      expect(normalized.transactions[0].updatedAt).toBeDefined();
     });
   });
 
@@ -500,7 +580,7 @@ describe("Financial Calculations", () => {
       expect(metrics.netWorth).toBe(-440000);
     });
 
-    it("should exclude Lent from net worth calculations", () => {
+    it("should include other-account balances in net worth calculations", () => {
       const store = createStore({
         accounts: [
           { id: "1", name: "Bank", type: "bank", balance: 100000, deleted: false },
@@ -524,8 +604,591 @@ describe("Financial Calculations", () => {
       });
 
       const metrics = calculateMetrics(store);
-      // Net worth should only include bank, not lent
-      expect(metrics.netWorth).toBe(90000); // 100000 - 10000
+      expect(metrics.netWorth).toBe(140000); // 150000 - 10000
+    });
+  });
+
+  describe("Account ID based transactions", () => {
+    it("should update balances when out transactions reference account IDs", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-out",
+        date: "2026-01-01",
+        ledger: "Groceries",
+        amount: 150,
+        type: "out",
+        category: "Food",
+        fromAccountId: "source",
+        notes: "",
+        tags: [],
+      });
+
+      expect(result.accounts.find((account) => account.id === "source")?.balance).toBe(850);
+    });
+
+    it("should update balances when in transactions reference account IDs", () => {
+      const store = createStore({
+        accounts: [
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-in",
+        date: "2026-01-01",
+        ledger: "Salary",
+        amount: 250,
+        type: "in",
+        category: "Income",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      expect(result.accounts.find((account) => account.id === "dest")?.balance).toBe(750);
+    });
+
+    it("should use account IDs for transfer balances even when names are duplicated", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Shared", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Shared", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-transfer",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 200,
+        type: "transfer",
+        category: "Self Transfer",
+        fromAccountId: "source",
+        toAccountId: "dest",
+        fromAccount: "Shared",
+        toAccount: "Shared",
+        notes: "",
+        tags: [],
+      });
+
+      expect(result.accounts.find((account) => account.id === "source")?.balance).toBe(800);
+      expect(result.accounts.find((account) => account.id === "dest")?.balance).toBe(700);
+    });
+
+    it("should use card IDs for out transactions even when card names are duplicated", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "card-a",
+            name: "Shared Card",
+            provider: "Bank A",
+            creditLimit: 50000,
+            outstanding: 1000,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-01",
+            deleted: false,
+          },
+          {
+            id: "card-b",
+            name: "Shared Card",
+            provider: "Bank B",
+            creditLimit: 60000,
+            outstanding: 2500,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 20,
+            nextDueDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-card-id",
+        date: "2026-01-01",
+        ledger: "Online purchase",
+        amount: 300,
+        type: "out",
+        category: "Shopping",
+        fromAccount: "Shared Card",
+        fromCardId: "card-b",
+        notes: "",
+        tags: [],
+      });
+
+      const cardA = result.creditCards.find((card) => card.id === "card-a");
+      const cardB = result.creditCards.find((card) => card.id === "card-b");
+
+      expect(cardA?.outstanding).toBe(1000);
+      expect(cardA?.unbilled ?? 0).toBe(0);
+      expect((cardB?.outstanding ?? 0) + (cardB?.unbilled ?? 0)).toBe(2800);
+    });
+
+    it("should use card IDs for in transactions even when card names are duplicated", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "card-a",
+            name: "Shared Card",
+            provider: "Bank A",
+            creditLimit: 50000,
+            outstanding: 1000,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-01",
+            deleted: false,
+          },
+          {
+            id: "card-b",
+            name: "Shared Card",
+            provider: "Bank B",
+            creditLimit: 60000,
+            outstanding: 2500,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 20,
+            nextDueDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-card-dest-id",
+        date: "2026-01-01",
+        ledger: "Card payment",
+        amount: 300,
+        type: "in",
+        category: "Card Payment",
+        toAccount: "Shared Card",
+        toCardId: "card-b",
+        notes: "",
+        tags: [],
+      });
+
+      expect(result.creditCards.find((card) => card.id === "card-a")?.outstanding).toBe(1000);
+      expect(result.creditCards.find((card) => card.id === "card-b")?.outstanding).toBe(2200);
+    });
+  });
+
+  describe("Self Transfer Operations", () => {
+    it("should move money between accounts without changing totals", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 200,
+        type: "self",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      expect(result.accounts.find((a) => a.name === "Checking")?.balance).toBe(800);
+      expect(result.accounts.find((a) => a.name === "Savings")?.balance).toBe(700);
+      expect(result.accounts.reduce((sum, account) => sum + account.balance, 0)).toBe(1500);
+
+      const metrics = calculateMetrics(result);
+      expect(metrics.totalAssets).toBe(1500);
+      expect(metrics.netWorth).toBe(1500);
+      expect(metrics.todayIncome).toBe(0);
+      expect(metrics.todayExpense).toBe(0);
+    });
+
+    it("should reject transfers when the source account has insufficient funds", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 100, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      expect(() =>
+        applyTransaction(store, {
+          id: "tx-self",
+          date: "2026-01-01",
+          ledger: "Transfer",
+          amount: 200,
+          type: "transfer",
+          category: "Self Transfer",
+          fromAccount: "Checking",
+          fromAccountId: "source",
+          toAccount: "Savings",
+          toAccountId: "dest",
+          notes: "",
+          tags: [],
+        })
+      ).toThrow("Insufficient funds for transfer");
+    });
+
+    it("should normalize legacy self transfers to the stable transfer type", () => {
+      const normalized = normalizeStore({
+        transactions: [
+          {
+            id: "tx-self",
+            date: "2026-01-01",
+            ledger: "Transfer",
+            amount: 200,
+            type: "self",
+            category: "Self Transfer",
+            fromAccount: "Checking",
+            toAccount: "Savings",
+            notes: "",
+            tags: [],
+          },
+        ],
+      });
+
+      expect(normalized.transactions[0].type).toBe("transfer");
+      expect(normalized.transactions[0].fromAccountId).toBeUndefined();
+      expect(normalized.transactions[0].toAccountId).toBeUndefined();
+      expect(normalized.transactions[0].transferResolution).toBe("unresolved-legacy-name");
+    });
+
+    it("should migrate legacy transfer names to IDs when each name maps uniquely", () => {
+      const normalized = normalizeStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+        transactions: [
+          {
+            id: "tx-self",
+            date: "2026-01-01",
+            ledger: "Transfer",
+            amount: 200,
+            type: "self",
+            category: "Self Transfer",
+            fromAccount: "Checking",
+            toAccount: "Savings",
+            notes: "",
+            tags: [],
+          },
+        ],
+      });
+
+      expect(normalized.transactions[0].fromAccountId).toBe("source");
+      expect(normalized.transactions[0].toAccountId).toBe("dest");
+      expect(normalized.transactions[0].transferResolution).toBe("resolved");
+    });
+
+    it("should keep legacy transfer unresolved when duplicate names are ambiguous", () => {
+      const normalized = normalizeStore({
+        accounts: [
+          { id: "source-a", name: "HDFC Savings", type: "bank", balance: 1000, deleted: false },
+          { id: "source-b", name: "HDFC Savings", type: "bank", balance: 900, deleted: false },
+          { id: "dest", name: "Emergency", type: "bank", balance: 500, deleted: false },
+        ],
+        transactions: [
+          {
+            id: "tx-self",
+            date: "2026-01-01",
+            ledger: "Transfer",
+            amount: 200,
+            type: "transfer",
+            category: "Self Transfer",
+            fromAccount: "HDFC Savings",
+            toAccount: "Emergency",
+            notes: "",
+            tags: [],
+          },
+        ],
+      });
+
+      expect(normalized.transactions[0].fromAccountId).toBeUndefined();
+      expect(normalized.transactions[0].toAccountId).toBe("dest");
+      expect(normalized.transactions[0].transferResolution).toBe("unresolved-legacy-name");
+    });
+
+    it("should reject self transfers to the same account", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+        ],
+      });
+
+      expect(() =>
+        applyTransaction(store, {
+          id: "tx-self",
+          date: "2026-01-01",
+          ledger: "Transfer",
+          amount: 200,
+          type: "self",
+          category: "Self Transfer",
+          fromAccount: "Checking",
+          fromAccountId: "source",
+          toAccount: "Checking",
+          toAccountId: "source",
+          notes: "",
+          tags: [],
+        })
+      ).toThrow("Self transfer requires different accounts");
+    });
+
+    it("should reject zero or negative amounts", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      expect(() =>
+        applyTransaction(store, {
+          id: "tx-self",
+          date: "2026-01-01",
+          ledger: "Transfer",
+          amount: 0,
+          type: "self",
+          category: "Self Transfer",
+          fromAccount: "Checking",
+          fromAccountId: "source",
+          toAccount: "Savings",
+          toAccountId: "dest",
+          notes: "",
+          tags: [],
+        })
+      ).toThrow("Self transfer amount must be greater than zero");
+
+      expect(() =>
+        applyTransaction(store, {
+          id: "tx-self",
+          date: "2026-01-01",
+          ledger: "Transfer",
+          amount: -50,
+          type: "self",
+          category: "Self Transfer",
+          fromAccount: "Checking",
+          fromAccountId: "source",
+          toAccount: "Savings",
+          toAccountId: "dest",
+          notes: "",
+          tags: [],
+        })
+      ).toThrow("Self transfer amount must be greater than zero");
+    });
+
+    it("should preserve createdAt and update updatedAt on transfer edits", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      const applied = applyTransaction(store, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 100,
+        type: "transfer",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      const updated = updateTransaction(applied, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 100,
+        type: "transfer",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 150,
+        type: "transfer",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      const transaction = updated.transactions.find((item) => item.id === "tx-self");
+      expect(transaction?.createdAt).toBe("2026-01-01T00:00:00.000Z");
+      expect(transaction?.updatedAt).toBeDefined();
+      expect(transaction?.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
+    });
+
+    it("should reverse the old transfer before applying an edited transfer", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      const applied = applyTransaction(store, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 100,
+        type: "self",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      const updated = updateTransaction(applied, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 100,
+        type: "self",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      }, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 300,
+        type: "self",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      expect(updated.accounts.find((a) => a.name === "Checking")?.balance).toBe(700);
+      expect(updated.accounts.find((a) => a.name === "Savings")?.balance).toBe(800);
+    });
+
+    it("should reverse both sides when a transfer is deleted", () => {
+      const store = createStore({
+        accounts: [
+          { id: "source", name: "Checking", type: "bank", balance: 1000, deleted: false },
+          { id: "dest", name: "Savings", type: "bank", balance: 500, deleted: false },
+        ],
+      });
+
+      const applied = applyTransaction(store, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 200,
+        type: "self",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      const deleted = deleteTransaction(applied, {
+        id: "tx-self",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 200,
+        type: "self",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      expect(deleted.accounts.find((a) => a.name === "Checking")?.balance).toBe(1000);
+      expect(deleted.accounts.find((a) => a.name === "Savings")?.balance).toBe(500);
+    });
+
+    it("updates account updatedAt when a transfer changes its balance", () => {
+      const store = createStore({
+        accounts: [
+          {
+            id: "source",
+            name: "Checking",
+            type: "bank",
+            balance: 1000,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            deleted: false,
+          },
+          {
+            id: "dest",
+            name: "Savings",
+            type: "bank",
+            balance: 500,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            deleted: false,
+          },
+        ],
+      });
+
+      const result = applyTransaction(store, {
+        id: "tx-touch",
+        date: "2026-01-01",
+        ledger: "Transfer",
+        amount: 100,
+        type: "transfer",
+        category: "Self Transfer",
+        fromAccount: "Checking",
+        fromAccountId: "source",
+        toAccount: "Savings",
+        toAccountId: "dest",
+        notes: "",
+        tags: [],
+      });
+
+      const source = result.accounts.find((account) => account.id === "source");
+      const destination = result.accounts.find((account) => account.id === "dest");
+
+      expect(source?.updatedAt).toBeDefined();
+      expect(destination?.updatedAt).toBeDefined();
+      expect(source?.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
+      expect(destination?.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
     });
   });
 
@@ -735,6 +1398,68 @@ describe("Financial Calculations", () => {
 
       const metrics = calculateMetrics(store);
       expect(metrics.totalAssets).toBeCloseTo(1500.75, 2);
+    });
+  });
+
+  describe("Account Balance History", () => {
+    it("should match transfer transactions by account IDs even when names changed", () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const store = createStore({
+        accounts: [
+          { id: "acc-1", name: "Checking (Renamed)", type: "bank", balance: 900, deleted: false },
+          { id: "acc-2", name: "Savings", type: "bank", balance: 1100, deleted: false },
+        ],
+        transactions: [
+          {
+            id: "tx-1",
+            date: todayStr,
+            type: "transfer",
+            amount: 100,
+            category: "Self Transfer",
+            ledger: "Transfer",
+            fromAccount: "Checking",
+            fromAccountId: "acc-1",
+            toAccount: "Savings",
+            toAccountId: "acc-2",
+            notes: "",
+            tags: [],
+            deleted: false,
+          },
+        ],
+      });
+
+      const history = getAccountBalanceHistory(store, "acc-1", 2);
+      expect(history).toHaveLength(2);
+      expect(history[1].balance).toBe(1000);
+    });
+
+    it("should keep legacy name-based matching when IDs are missing", () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const store = createStore({
+        accounts: [
+          { id: "acc-1", name: "Checking", type: "bank", balance: 900, deleted: false },
+          { id: "acc-2", name: "Savings", type: "bank", balance: 1100, deleted: false },
+        ],
+        transactions: [
+          {
+            id: "tx-legacy",
+            date: todayStr,
+            type: "transfer",
+            amount: 100,
+            category: "Self Transfer",
+            ledger: "Transfer",
+            fromAccount: "Checking",
+            toAccount: "Savings",
+            notes: "",
+            tags: [],
+            deleted: false,
+          },
+        ],
+      });
+
+      const history = getAccountBalanceHistory(store, "acc-1", 2);
+      expect(history).toHaveLength(2);
+      expect(history[1].balance).toBe(1000);
     });
   });
 });

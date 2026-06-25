@@ -1,11 +1,15 @@
-import { useState, useRef } from "react";
-import { useStore, CreditCard } from "@/hooks/useStore";
+import { useState, useRef, useEffect } from "react";
+import { useStore, CreditCard, updateCreditCard, archiveRecord, restoreRecord } from "@/hooks/useStore";
 import { formatCurrency, cn } from "@/lib/utils";
+import { calculateMetrics } from "@/lib/calculations";
 import { ChevronUp, ChevronDown, Plus, Pencil } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export function CreditCardsTab() {
   const { store, updateStore } = useStore();
+  const [location] = useLocation();
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -16,14 +20,47 @@ export function CreditCardsTab() {
   const [editUnbilled, setEditUnbilled] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
   const [editNextDueDate, setEditNextDueDate] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!location.startsWith("/cards")) {
+      return;
+    }
+
+    const focusId = new URLSearchParams(window.location.search).get("focus");
+    if (!focusId) {
+      return;
+    }
+
+    const target = store.creditCards.find((card) => card.id === focusId && !card.deleted);
+    if (!target) {
+      return;
+    }
+
+    const shouldShowArchived = Boolean(target.archivedAt);
+    if (showArchived !== shouldShowArchived) {
+      setShowArchived(shouldShowArchived);
+    }
+
+    setExpandedCardId(focusId);
+    setEditingCardId(null);
+    setHighlightedId(focusId);
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedId((previous) => (previous === focusId ? null : previous));
+    }, 2500);
+
+    window.requestAnimationFrame(() => {
+      cardRefs.current[focusId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    return () => window.clearTimeout(timeout);
+  }, [location, showArchived, store.creditCards]);
 
   const handleUnbilledUpdate = (cardId: string, newUnbilled: number) => {
-    updateStore((prev) => ({
-      ...prev,
-      creditCards: prev.creditCards.map((c) =>
-        c.id === cardId ? { ...c, unbilled: Math.max(0, newUnbilled) } : c
-      ),
-    }));
+    updateStore((prev) => updateCreditCard(prev, cardId, { unbilled: Math.max(0, newUnbilled) }));
   };
 
   const handleAddCard = () => {
@@ -43,9 +80,11 @@ export function CreditCardsTab() {
           dueDate: 15,
           nextDueDate: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       ],
     }));
+    toast({ title: "Card added", description: "Your card was added successfully." });
   };
 
   const handleEditStart = (card: CreditCard) => {
@@ -61,29 +100,54 @@ export function CreditCardsTab() {
   };
 
   const handleEditSave = (cardId: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      creditCards: prev.creditCards.map((c) =>
-        c.id === cardId ? {
-          ...c,
-          name: editName,
-          provider: editProvider,
-          cardType: editCardType,
-          creditLimit: parseInt(editLimit) || 0,
-          outstanding: parseInt(editOutstanding) || 0,
-          unbilled: parseInt(editUnbilled) || 0,
-          dueDate: parseInt(editDueDate) || 15,
-          nextDueDate: editNextDueDate ? new Date(editNextDueDate).toISOString() : c.nextDueDate,
-        } : c
-      ),
+    updateStore((prev) => updateCreditCard(prev, cardId, {
+      name: editName,
+      provider: editProvider,
+      cardType: editCardType,
+      creditLimit: parseInt(editLimit) || 0,
+      outstanding: parseInt(editOutstanding) || 0,
+      unbilled: parseInt(editUnbilled) || 0,
+      dueDate: parseInt(editDueDate) || 15,
+      nextDueDate: editNextDueDate ? new Date(editNextDueDate).toISOString() : undefined,
     }));
     setEditingCardId(null);
+    toast({ title: "Card updated", description: "The card details were saved." });
   };
 
-  const visibleCards = store.creditCards.filter((c) => !c.deleted);
-  const totalLimit = visibleCards.reduce((sum, c) => sum + c.creditLimit, 0);
-  const totalOutstanding = visibleCards.reduce((sum, c) => sum + c.outstanding, 0);
-  const totalUnbilled = visibleCards.reduce((sum, c) => sum + (c.unbilled ?? 0), 0);
+  const handleArchiveCard = (cardId: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      creditCards: archiveRecord(prev.creditCards, cardId),
+    }));
+    toast({ title: "Card archived", description: "The card was archived and removed from active totals." });
+  };
+
+  const handleHardDeleteCard = (cardId: string) => {
+    if (!window.confirm("Permanently delete this record? This cannot be undone.")) {
+      return;
+    }
+
+    updateStore((prev) => updateCreditCard(prev, cardId, { deleted: true }));
+    toast({ title: "Card deleted", description: "The record was permanently deleted." });
+  };
+
+  const handleRestoreCard = (cardId: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      creditCards: restoreRecord(prev.creditCards, cardId),
+    }));
+    toast({ title: "Card restored", description: "The card is active again." });
+  };
+
+  const visibleCards = store.creditCards.filter(
+    (card) =>
+      !card.deleted &&
+      (showArchived ? Boolean(card.archivedAt) : !card.archivedAt)
+  );
+  const metrics = calculateMetrics(store);
+  const totalLimit = metrics.creditCardTotalLimit;
+  const totalOutstanding = metrics.creditCardOutstanding;
+  const totalUnbilled = metrics.creditCardUnbilled;
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-6">
@@ -98,6 +162,13 @@ export function CreditCardsTab() {
         >
           {formatCurrency(totalLimit - totalOutstanding - totalUnbilled)}
         </h2>
+        <button
+          type="button"
+          onClick={() => setShowArchived((value) => !value)}
+          className="text-xs text-primary underline mb-4"
+        >
+          {showArchived ? "Show Active" : "Show Archived"}
+        </button>
         <div className="flex w-full justify-between px-4 text-xs">
           <div className="flex flex-col items-center">
             <span className="text-muted-foreground uppercase mb-1">Credit Limit</span>
@@ -129,7 +200,13 @@ export function CreditCardsTab() {
             const available = card.creditLimit - card.outstanding - (card.unbilled ?? 0);
 
             return (
-              <div key={card.id} className="glass-card overflow-hidden">
+              <div
+                key={card.id}
+                ref={(element) => {
+                  cardRefs.current[card.id] = element;
+                }}
+                className={cn("glass-card overflow-hidden", highlightedId === card.id && "ring-2 ring-primary/60")}
+              >
                 {/* Card Header */}
                 <div className="w-full text-left p-4 flex items-start justify-between hover:bg-white/5 transition-colors">
                   {/* Edit mode: show editable fields */}
@@ -334,6 +411,35 @@ export function CreditCardsTab() {
                           <p className="font-bold text-sm mt-1">
                             {card.nextDueDate ? format(new Date(card.nextDueDate), "d MMM yyyy") : "Not set"}
                           </p>
+                        </div>
+
+                        <div className="border-t border-white/10 pt-3 flex items-center justify-end gap-2">
+                          {card.archivedAt ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreCard(card.id)}
+                                className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleHardDeleteCard(card.id)}
+                                className="px-2 py-1 rounded text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleArchiveCard(card.id)}
+                              className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+                            >
+                              Archive
+                            </button>
+                          )}
                         </div>
                       </>
                     )}

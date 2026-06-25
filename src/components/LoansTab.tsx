@@ -1,11 +1,14 @@
 import { formatCurrency, cn } from "@/lib/utils";
-import { useStore } from "@/hooks/useStore";
-import { useState, useRef } from "react";
+import { useStore, updateLoan, archiveRecord, restoreRecord } from "@/hooks/useStore";
+import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { Plus, Pencil } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export function LoansTab() {
   const { store, updateStore } = useStore();
+  const [location] = useLocation();
   const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editLender, setEditLender] = useState("");
@@ -14,6 +17,43 @@ export function LoansTab() {
   const [editEMI, setEditEMI] = useState("");
   const [editRemainingMonths, setEditRemainingMonths] = useState("");
   const [editNextEmiDate, setEditNextEmiDate] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const loanRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!location.startsWith("/loans")) {
+      return;
+    }
+
+    const focusId = new URLSearchParams(window.location.search).get("focus");
+    if (!focusId) {
+      return;
+    }
+
+    const target = store.loans.find((loan) => loan.id === focusId && !loan.deleted);
+    if (!target) {
+      return;
+    }
+
+    const shouldShowArchived = Boolean(target.archivedAt);
+    if (showArchived !== shouldShowArchived) {
+      setShowArchived(shouldShowArchived);
+    }
+
+    setEditingLoanId(null);
+    setHighlightedId(focusId);
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedId((previous) => (previous === focusId ? null : previous));
+    }, 2500);
+
+    window.requestAnimationFrame(() => {
+      loanRefs.current[focusId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    return () => window.clearTimeout(timeout);
+  }, [location, showArchived, store.loans]);
 
   const handleAddLoan = () => {
     updateStore((prev) => ({
@@ -54,25 +94,48 @@ export function LoansTab() {
   };
 
   const handleEditSave = (loanId: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      loans: prev.loans.map((l) =>
-        l.id === loanId ? {
-          ...l,
-          name: editName,
-          lender: editLender,
-          principal: parseInt(editPrincipal) || 0,
-          outstanding: parseInt(editOutstanding) || 0,
-          emiAmount: parseInt(editEMI) || 0,
-          emiCount: parseInt(editRemainingMonths) + l.paidCount,
-          nextEmiDate: editNextEmiDate ? new Date(editNextEmiDate).toISOString() : l.nextEmiDate,
-        } : l
-      ),
+    updateStore((prev) => updateLoan(prev, loanId, {
+      name: editName,
+      lender: editLender,
+      principal: parseInt(editPrincipal) || 0,
+      outstanding: parseInt(editOutstanding) || 0,
+      emiAmount: parseInt(editEMI) || 0,
+      emiCount: parseInt(editRemainingMonths) + (store.loans.find((l) => l.id === loanId)?.paidCount ?? 0),
+      nextEmiDate: editNextEmiDate ? new Date(editNextEmiDate).toISOString() : undefined,
     }));
     setEditingLoanId(null);
   };
 
-  const visibleLoans = store.loans.filter((l) => !l.deleted);
+  const handleArchiveLoan = (loanId: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      loans: archiveRecord(prev.loans, loanId),
+    }));
+    toast({ title: "Loan archived", description: "The loan was archived and removed from active totals." });
+  };
+
+  const handleHardDeleteLoan = (loanId: string) => {
+    if (!window.confirm("Permanently delete this record? This cannot be undone.")) {
+      return;
+    }
+
+    updateStore((prev) => updateLoan(prev, loanId, { deleted: true }));
+    toast({ title: "Loan deleted", description: "The record was permanently deleted." });
+  };
+
+  const handleRestoreLoan = (loanId: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      loans: restoreRecord(prev.loans, loanId),
+    }));
+    toast({ title: "Loan restored", description: "The loan is active again." });
+  };
+
+  const visibleLoans = store.loans.filter(
+    (loan) =>
+      !loan.deleted &&
+      (showArchived ? Boolean(loan.archivedAt) : !loan.archivedAt)
+  );
   const totalOutstanding = visibleLoans.reduce((sum, l) => sum + l.outstanding, 0);
   const totalEmiPerMonth = visibleLoans.reduce((sum, l) => sum + l.emiAmount, 0);
 
@@ -87,6 +150,13 @@ export function LoansTab() {
         )}>
           {formatCurrency(totalOutstanding)}
         </h2>
+        <button
+          type="button"
+          onClick={() => setShowArchived((value) => !value)}
+          className="text-xs text-primary underline mb-4"
+        >
+          {showArchived ? "Show Active" : "Show Archived"}
+        </button>
         <div className="flex w-full justify-between px-4">
           <div className="flex flex-col items-center">
             <span className="text-muted-foreground text-xs uppercase mb-1">Monthly EMI</span>
@@ -113,7 +183,10 @@ export function LoansTab() {
             return (
               <div 
                 key={loan.id} 
-                className="glass-card p-4 space-y-3"
+                ref={(element) => {
+                  loanRefs.current[loan.id] = element;
+                }}
+                className={cn("glass-card p-4 space-y-3", highlightedId === loan.id && "ring-2 ring-primary/60")}
               >
                 {/* Header with Edit Button */}
                 <div className="flex items-start justify-between gap-2">
@@ -250,6 +323,37 @@ export function LoansTab() {
                         className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none mt-1"
                       />
                     </div>
+                  </div>
+                )}
+
+                {!isEditing && (
+                  <div className="border-t border-white/10 pt-3 flex items-center justify-end gap-2">
+                    {loan.archivedAt ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreLoan(loan.id)}
+                          className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleHardDeleteLoan(loan.id)}
+                          className="px-2 py-1 rounded text-xs font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveLoan(loan.id)}
+                        className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+                      >
+                        Archive
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

@@ -6,9 +6,12 @@ import { AssetsTab } from "@/components/AssetsTab";
 import { LiabilitiesTab } from "@/components/LiabilitiesTab";
 import { CreditCardsTab } from "@/components/CreditCardsTab";
 import { LoansTab } from "@/components/LoansTab";
+import ArchivedTab from "@/components/ArchivedTab";
 import { ProfileMenu } from "@/components/ProfileMenu";
-import { Home, Calendar, WalletCards, CreditCard, Landmark } from "lucide-react";
+import NotFound from "@/pages/not-found";
+import { Home, Calendar, WalletCards, CreditCard, Landmark, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/toaster";
 
 const walletIconPath = "/logo.svg";
 const profileIconPath = "/avatar.svg";
@@ -21,14 +24,14 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   "/cards": CreditCardsTab,
   "/loans": LoansTab,
   "/others": LiabilitiesTab,
+  "/archived": ArchivedTab,
 };
 
 function App() {
   const [location, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Get component for current location, default to HomeTab
-  const CurrentTab = TAB_COMPONENTS[location] || TAB_COMPONENTS["/"];
+  const CurrentTab = TAB_COMPONENTS[location];
 
   return (
     <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col relative overflow-x-hidden selection:bg-primary/30">
@@ -48,7 +51,7 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-md mx-auto">
-        <CurrentTab />
+        {CurrentTab ? <CurrentTab /> : <NotFound />}
       </main>
 
       {/* Bottom Nav */}
@@ -64,13 +67,14 @@ function App() {
             isActive={location === "/cards"} onClick={() => setLocation("/cards")} />
           <NavButton icon={<Landmark className="w-5 h-5" />} label="Loans"
             isActive={location === "/loans"} onClick={() => setLocation("/loans")} />
-          <NavButton icon={<CreditCard className="w-5 h-6" />} label="Others"
+          <NavButton icon={<HandCoins className="w-5 h-6" />} label="More"
             isActive={location === "/others"} onClick={() => setLocation("/others")} />
         </div>
       </nav>
 
       {/* Profile Menu */}
       <ProfileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <Toaster />
     </div>
   );
 }
@@ -82,7 +86,11 @@ function NavButton({ icon, label, isActive, onClick }: {
   onClick: () => void;
 }) {
   return (
-    <button onClick={onClick}
+    <button
+      type="button"
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
+      onClick={onClick}
       className={cn("flex flex-col items-center justify-center gap-1 px-3 py-2 relative transition-all duration-300 shrink-0 whitespace-nowrap",
         isActive ? "text-primary" : "text-muted-foreground hover:text-white/70")}>
       {icon}

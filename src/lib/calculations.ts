@@ -1,4 +1,4 @@
-import { Store } from "@/hooks/useStore";
+import { Store, Transaction } from "@/hooks/useStore";
 
 /**
  * Automatic calculations for all financial metrics
@@ -15,6 +15,7 @@ export interface FinancialMetrics {
   totalAssets: number;
 
   creditCardOutstanding: number;
+  creditCardUnbilled: number;
   creditCardTotalLimit: number;
   creditCardAvailableLimit: number;
 
@@ -35,6 +36,10 @@ export interface FinancialMetrics {
   monthlyNet: number;
 }
 
+function normalizeAccountReference(value?: string) {
+  return value?.replace(/^account:/, "").replace(/^card:/, "");
+}
+
 export function calculateMetrics(store: Store): FinancialMetrics {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -46,60 +51,71 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Account Balances by Type
   // ─────────────────────────────────────────────────────────────────────────────
   const cashBalance = store.accounts
-    .filter((a) => a.type === "cash" && !a.deleted)
+    .filter((a) => a.type === "cash" && !a.deleted && !a.archivedAt)
     .reduce((sum, a) => sum + a.balance, 0);
 
   const bankBalance = store.accounts
-    .filter((a) => a.type === "bank" && !a.deleted)
+    .filter((a) => a.type === "bank" && !a.deleted && !a.archivedAt)
     .reduce((sum, a) => sum + a.balance, 0);
 
   const businessBalance = store.accounts
-    .filter((a) => a.type === "business" && !a.deleted)
+    .filter((a) => a.type === "business" && !a.deleted && !a.archivedAt)
     .reduce((sum, a) => sum + a.balance, 0);
 
   const investmentsBalance = store.accounts
-    .filter((a) => a.type === "investments" && !a.deleted)
+    .filter((a) => a.type === "investments" && !a.deleted && !a.archivedAt)
     .reduce((sum, a) => sum + a.balance, 0);
 
   const insuranceBalance = store.accounts
-    .filter((a) => a.type === "insurance" && !a.deleted)
+    .filter((a) => a.type === "insurance" && !a.deleted && !a.archivedAt)
     .reduce((sum, a) => sum + a.balance, 0);
 
   const otherAssetsBalance = store.accounts
-    .filter((a) => a.type === "other" && !a.deleted)
+    .filter((a) => a.type === "other" && !a.deleted && !a.archivedAt)
     .reduce((sum, a) => sum + a.balance, 0);
 
   const totalAssets =
-    cashBalance + bankBalance + businessBalance + investmentsBalance + insuranceBalance;
+    cashBalance + bankBalance + businessBalance + investmentsBalance + insuranceBalance + otherAssetsBalance;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Credit Card Metrics
   // ─────────────────────────────────────────────────────────────────────────────
   const creditCardOutstanding = store.creditCards
-    .filter((c) => !c.deleted)
+    .filter((c) => !c.deleted && !c.archivedAt)
     .reduce((sum, c) => sum + c.outstanding, 0);
 
+  const creditCardUnbilled = store.creditCards
+    .filter((card) => !card.deleted && !card.archivedAt)
+    .reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
+
   const creditCardTotalLimit = store.creditCards
-    .filter((c) => !c.deleted)
+    .filter((c) => !c.deleted && !c.archivedAt)
     .reduce((sum, c) => sum + c.creditLimit, 0);
 
-  const creditCardAvailableLimit = creditCardTotalLimit - creditCardOutstanding;
+  const creditCardAvailableLimit =
+    creditCardTotalLimit -
+    creditCardOutstanding -
+    creditCardUnbilled;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Loan Metrics
   // ─────────────────────────────────────────────────────────────────────────────
   const loanOutstanding = store.loans
-    .filter((l) => !l.deleted)
+    .filter((l) => !l.deleted && !l.archivedAt)
     .reduce((sum, l) => sum + l.outstanding, 0);
 
   const loanTotalPrincipal = store.loans
-    .filter((l) => !l.deleted)
+    .filter((l) => !l.deleted && !l.archivedAt)
     .reduce((sum, l) => sum + l.principal, 0);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Total Liabilities (Credit Cards + Loans)
+  // Total Liabilities (Credit Cards + Loans + Manual Liabilities)
   // ─────────────────────────────────────────────────────────────────────────────
-  const totalLiabilities = creditCardOutstanding + loanOutstanding;
+  const manualLiabilities = store.liabilities
+    .filter((item) => !item.deleted && !item.archivedAt)
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const totalLiabilities = creditCardOutstanding + loanOutstanding + manualLiabilities;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Net Worth
@@ -110,7 +126,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Today's Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
   const todayTransactions = store.transactions.filter(
-    (t) => !t.deleted && t.date === todayStr
+    (t) => !t.deleted && !t.archivedAt && t.date === todayStr
   );
 
   const todayIncome = todayTransactions
@@ -127,7 +143,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Monthly Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
   const monthTransactions = store.transactions.filter(
-    (t) => !t.deleted && t.date >= monthStartStr && t.date <= todayStr
+    (t) => !t.deleted && !t.archivedAt && t.date >= monthStartStr && t.date <= todayStr
   );
 
   const monthlyIncome = monthTransactions
@@ -150,6 +166,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
     totalAssets,
 
     creditCardOutstanding,
+    creditCardUnbilled,
     creditCardTotalLimit,
     creditCardAvailableLimit,
 
@@ -173,7 +190,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
  * Get account balance by account ID
  */
 export function getAccountBalance(store: Store, accountId: string): number {
-  const account = store.accounts.find((a) => a.id === accountId && !a.deleted);
+  const account = store.accounts.find((a) => a.id === accountId && !a.deleted && !a.archivedAt);
   return account?.balance ?? 0;
 }
 
@@ -181,7 +198,7 @@ export function getAccountBalance(store: Store, accountId: string): number {
  * Get credit card available credit
  */
 export function getCreditCardAvailable(store: Store, cardId: string): number {
-  const card = store.creditCards.find((c) => c.id === cardId && !c.deleted);
+  const card = store.creditCards.find((c) => c.id === cardId && !c.deleted && !c.archivedAt);
   if (!card) return 0;
   return card.creditLimit - card.outstanding;
 }
@@ -190,7 +207,7 @@ export function getCreditCardAvailable(store: Store, cardId: string): number {
  * Get loan EMI dates
  */
 export function getNextLoanEmiDate(store: Store, loanId: string): Date | null {
-  const loan = store.loans.find((l) => l.id === loanId && !l.deleted);
+  const loan = store.loans.find((l) => l.id === loanId && !l.deleted && !l.archivedAt);
   if (!loan || !loan.nextEmiDate) return null;
   return new Date(loan.nextEmiDate);
 }
@@ -199,7 +216,7 @@ export function getNextLoanEmiDate(store: Store, loanId: string): Date | null {
  * Calculate remaining EMIs
  */
 export function getRemainingEmis(store: Store, loanId: string): number {
-  const loan = store.loans.find((l) => l.id === loanId && !l.deleted);
+  const loan = store.loans.find((l) => l.id === loanId && !l.deleted && !l.archivedAt);
   if (!loan) return 0;
   return loan.emiCount - loan.paidCount;
 }
@@ -213,7 +230,7 @@ export function getTransactionsInRange(
   endDate: string
 ): typeof store.transactions {
   return store.transactions.filter(
-    (t) => !t.deleted && t.date >= startDate && t.date <= endDate
+    (t) => !t.deleted && !t.archivedAt && t.date >= startDate && t.date <= endDate
   );
 }
 
@@ -225,7 +242,7 @@ export function getTransactionsByCategory(
   category: string
 ): typeof store.transactions {
   return store.transactions.filter(
-    (t) => !t.deleted && t.category === category
+    (t) => !t.deleted && !t.archivedAt && t.category === category
   );
 }
 
@@ -237,7 +254,7 @@ export function getTransactionsByTag(
   tag: string
 ): typeof store.transactions {
   return store.transactions.filter(
-    (t) => !t.deleted && t.tags.includes(tag)
+    (t) => !t.deleted && !t.archivedAt && t.tags.includes(tag)
   );
 }
 
@@ -249,16 +266,27 @@ export function getAccountBalanceHistory(
   accountId: string,
   days: number = 30
 ): Array<{ date: string; balance: number }> {
+  const account = store.accounts.find((a) => a.id === accountId);
+  if (!account) return [];
+
+  const isFromAccount = (transaction: Transaction) => {
+    const fromAccountId = normalizeAccountReference(transaction.fromAccountId);
+    return fromAccountId ? fromAccountId === accountId : transaction.fromAccount === account.name;
+  };
+
+  const isToAccount = (transaction: Transaction) => {
+    const toAccountId = normalizeAccountReference(transaction.toAccountId);
+    return toAccountId ? toAccountId === accountId : transaction.toAccount === account.name;
+  };
+
   const accountTransactions = store.transactions
     .filter(
       (t) =>
         !t.deleted &&
-        (t.fromAccount === accountId || t.toAccount === accountId)
+        !t.archivedAt &&
+        (isFromAccount(t) || isToAccount(t))
     )
     .sort((a, b) => a.date.localeCompare(b.date));
-
-  const account = store.accounts.find((a) => a.id === accountId);
-  if (!account) return [];
 
   const currentBalance = account.balance;
   const result = [];
@@ -275,9 +303,9 @@ export function getAccountBalanceHistory(
     // Find transactions for this date related to this account
     const dayTransactions = accountTransactions.filter((t) => t.date === dateStr);
     for (const t of dayTransactions.reverse()) {
-      if (t.fromAccount === accountId) {
+      if (isFromAccount(t)) {
         runningBalance += t.amount; // reverse the debit
-      } else if (t.toAccount === accountId) {
+      } else if (isToAccount(t)) {
         runningBalance -= t.amount; // reverse the credit
       }
     }

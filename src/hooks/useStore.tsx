@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as backupService from "@/lib/backupService";
 
-export type TransactionType = "in" | "out";
+export type TransactionType = "in" | "out" | "transfer";
+
+export function normalizeTransactionType(type?: string): TransactionType {
+  if (type === "transfer" || type === "self") return "transfer";
+  if (type === "in" || type === "out") return type;
+  return "out";
+}
 
 export interface Transaction {
   id: string;
@@ -12,10 +18,18 @@ export interface Transaction {
   category: string;
   account?: string;
   fromAccount?: string;
+  fromAccountId?: string;
+  fromCardId?: string;
   toAccount?: string;
+  toAccountId?: string;
+  toCardId?: string;
+  transferResolution?: "resolved" | "unresolved-legacy-name";
   notes: string;
   tags: string[];
   deleted?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type AccountType =
@@ -28,12 +42,15 @@ export type AccountType =
   | "other";
 
 export interface Account {
-  id?: string;
+  id: string;
   name: string;
   type?: AccountType;
   group?: "accounts" | "credit-cards";
   balance: number;
   deleted?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreditCard {
@@ -48,8 +65,10 @@ export interface CreditCard {
   statementDate: number;
   dueDate: number;
   nextDueDate: string;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   deleted?: boolean;
+  archivedAt?: string;
 }
 
 export interface Loan {
@@ -67,8 +86,10 @@ export interface Loan {
   remainingMonths?: number;
   startDate: string;
   nextEmiDate: string;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   deleted?: boolean;
+  archivedAt?: string;
 }
 
 export interface LiabilityItem {
@@ -78,6 +99,9 @@ export interface LiabilityItem {
   amount: number;
   dueDate: string;
   deleted?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LendItem {
@@ -86,6 +110,9 @@ export interface LendItem {
   amount: number;
   date: string;
   deleted?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Category {
@@ -93,6 +120,8 @@ export interface Category {
   name: string;
   type: TransactionType;
   deleted?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Store {
@@ -125,7 +154,6 @@ const INITIAL_DATA: Store = {
       statementDate: 1,
       dueDate: 20,
       nextDueDate: "",
-      createdAt: new Date().toISOString(),
     },
     {
       id: "hdfc-money-back",
@@ -136,7 +164,6 @@ const INITIAL_DATA: Store = {
       statementDate: 1,
       dueDate: 20,
       nextDueDate: "",
-      createdAt: new Date().toISOString(),
     },
     {
       id: "axis-neo",
@@ -147,7 +174,6 @@ const INITIAL_DATA: Store = {
       statementDate: 1,
       dueDate: 20,
       nextDueDate: "",
-      createdAt: new Date().toISOString(),
     },
     {
       id: "axis-my-zone",
@@ -158,7 +184,6 @@ const INITIAL_DATA: Store = {
       statementDate: 1,
       dueDate: 20,
       nextDueDate: "",
-      createdAt: new Date().toISOString(),
     },
   ],
   loans: [
@@ -177,7 +202,6 @@ const INITIAL_DATA: Store = {
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
-      createdAt: new Date().toISOString(),
     },
     {
       id: "cred-personal-loan-2",
@@ -194,7 +218,6 @@ const INITIAL_DATA: Store = {
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
-      createdAt: new Date().toISOString(),
     },
     {
       id: "bajaj-loan-emi",
@@ -211,7 +234,6 @@ const INITIAL_DATA: Store = {
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
-      createdAt: new Date().toISOString(),
     },
     {
       id: "hdfc-personal-loan",
@@ -228,7 +250,6 @@ const INITIAL_DATA: Store = {
       remainingMonths: 0,
       startDate: "",
       nextEmiDate: "",
-      createdAt: new Date().toISOString(),
     },
   ],
   liabilities: [
@@ -259,41 +280,274 @@ const INITIAL_DATA: Store = {
 
 const STORE_KEY = "moneymind-data";
 
+function createTimestamp() {
+  return new Date().toISOString();
+}
+
+function withTimestamps<T extends { createdAt?: string; updatedAt?: string }>(value: T): T {
+  const createdAt = value.createdAt ?? createTimestamp();
+  return {
+    ...value,
+    createdAt,
+    updatedAt: value.updatedAt ?? createdAt,
+  };
+}
+
 interface StoreContextValue {
   store: Store;
   updateStore: (updater: (prev: Store) => Store) => void;
 }
 
-const StoreContext = createContext<StoreContextValue | null>(null);
-
-function normalizeTransaction(transaction: Partial<Transaction>): Transaction {
+function touch<T extends { updatedAt?: string }>(item: T): T {
   return {
+    ...item,
+    updatedAt: createTimestamp(),
+  };
+}
+
+function updateRecord<T extends { createdAt?: string; updatedAt?: string }>(
+  item: T,
+  changes: Partial<T>
+): T {
+  return {
+    ...item,
+    ...changes,
+    createdAt: item.createdAt,
+    updatedAt: createTimestamp(),
+  };
+}
+
+export function updateAccount(store: Store, accountId: string, changes: Partial<Account>): Store {
+  return {
+    ...store,
+    accounts: store.accounts.map((account) =>
+      account.id === accountId ? updateRecord(account, changes) : account
+    ),
+  };
+}
+
+export function updateCreditCard(store: Store, cardId: string, changes: Partial<CreditCard>): Store {
+  return {
+    ...store,
+    creditCards: store.creditCards.map((card) =>
+      card.id === cardId ? updateRecord(card, changes) : card
+    ),
+  };
+}
+
+export function updateLoan(store: Store, loanId: string, changes: Partial<Loan>): Store {
+  return {
+    ...store,
+    loans: store.loans.map((loan) =>
+      loan.id === loanId ? updateRecord(loan, changes) : loan
+    ),
+  };
+}
+
+export function updateLiability(store: Store, liabilityId: string, changes: Partial<LiabilityItem>): Store {
+  return {
+    ...store,
+    liabilities: store.liabilities.map((item) =>
+      item.id === liabilityId ? updateRecord(item, changes) : item
+    ),
+  };
+}
+
+export function archiveRecord<T extends { id: string; archivedAt?: string; updatedAt?: string }>(
+  items: T[],
+  id: string
+): T[] {
+  const archivedAt = new Date().toISOString();
+  return items.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          archivedAt,
+          updatedAt: archivedAt,
+        }
+      : item
+  );
+}
+
+export function restoreRecord<
+  T extends { id: string; archivedAt?: string; updatedAt?: string }
+>(items: T[], id: string): T[] {
+  const updatedAt = new Date().toISOString();
+
+  return items.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          archivedAt: undefined,
+          updatedAt,
+        }
+      : item
+  );
+}
+
+const StoreContext = createContext<StoreContextValue | undefined>(undefined);
+
+function normalizeAccountReference(value?: string) {
+  return value?.replace(/^account:/, "").replace(/^card:/, "");
+}
+
+function resolveUniqueAccountIdByName(accounts: Account[], accountName?: string) {
+  if (!accountName) return undefined;
+
+  const matches = accounts.filter((account) => !account.deleted && !account.archivedAt && account.name === accountName);
+  return matches.length === 1 ? matches[0].id : undefined;
+}
+
+function normalizeTransaction(transaction: Partial<Transaction>, accounts: Account[]): Transaction {
+  const normalizedType = normalizeTransactionType(transaction.type);
+  let normalizedFromAccountId = normalizeAccountReference(transaction.fromAccountId);
+  let normalizedToAccountId = normalizeAccountReference(transaction.toAccountId);
+  const normalizedFromCardId = normalizeAccountReference(transaction.fromCardId);
+  const normalizedToCardId = normalizeAccountReference(transaction.toCardId);
+  let transferResolution: Transaction["transferResolution"];
+
+  if (normalizedType === "transfer") {
+    normalizedFromAccountId = normalizedFromAccountId ?? resolveUniqueAccountIdByName(accounts, transaction.fromAccount);
+    normalizedToAccountId = normalizedToAccountId ?? resolveUniqueAccountIdByName(accounts, transaction.toAccount);
+    transferResolution = normalizedFromAccountId && normalizedToAccountId
+      ? "resolved"
+      : "unresolved-legacy-name";
+  }
+
+  return withTimestamps({
     id: transaction.id ?? crypto.randomUUID(),
     date: transaction.date ?? new Date().toISOString(),
     ledger: transaction.ledger ?? "",
     amount: transaction.amount ?? 0,
-    type: transaction.type ?? "out",
+    type: normalizedType,
     category: transaction.category ?? "",
     account: transaction.account ?? transaction.fromAccount ?? transaction.toAccount ?? "",
     fromAccount: transaction.fromAccount,
+    fromAccountId: normalizedFromAccountId,
+    fromCardId: normalizedFromCardId,
     toAccount: transaction.toAccount,
+    toAccountId: normalizedToAccountId,
+    toCardId: normalizedToCardId,
+    transferResolution,
     notes: transaction.notes ?? "",
     tags: transaction.tags ?? [],
     deleted: transaction.deleted ?? false,
-  };
+    archivedAt: transaction.archivedAt,
+    createdAt: transaction.createdAt,
+    updatedAt: transaction.updatedAt,
+  });
 }
 
-function normalizeStore(parsed: Partial<Store>): Store {
+function normalizeAccount(account: Partial<Account>): Account {
+  const normalizedType = account.type === "investment" ? "investments" : account.type;
+
+  return withTimestamps({
+    id: account.id ?? crypto.randomUUID(),
+    name: account.name ?? "",
+    type: normalizedType,
+    group: account.group,
+    balance: account.balance ?? 0,
+    deleted: account.deleted ?? false,
+    archivedAt: account.archivedAt,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+  });
+}
+
+function normalizeCreditCard(card: Partial<CreditCard>): CreditCard {
+  return withTimestamps({
+    id: card.id ?? crypto.randomUUID(),
+    name: card.name ?? "",
+    provider: card.provider ?? "",
+    cardType: card.cardType,
+    cardNumber: card.cardNumber,
+    creditLimit: card.creditLimit ?? 0,
+    outstanding: card.outstanding ?? 0,
+    unbilled: card.unbilled ?? 0,
+    statementDate: card.statementDate ?? 1,
+    dueDate: card.dueDate ?? 15,
+    nextDueDate: card.nextDueDate ?? new Date().toISOString(),
+    createdAt: card.createdAt,
+    updatedAt: card.updatedAt,
+    deleted: card.deleted ?? false,
+    archivedAt: card.archivedAt,
+  });
+}
+
+function normalizeLoan(loan: Partial<Loan>): Loan {
+  return withTimestamps({
+    id: loan.id ?? crypto.randomUUID(),
+    name: loan.name ?? "",
+    lender: loan.lender ?? "",
+    principal: loan.principal ?? 0,
+    interestRate: loan.interestRate ?? 0,
+    emi: loan.emi,
+    emiAmount: loan.emiAmount ?? 0,
+    emiCount: loan.emiCount ?? 0,
+    paidCount: loan.paidCount ?? 0,
+    emiFrequency: loan.emiFrequency ?? "monthly",
+    outstanding: loan.outstanding ?? 0,
+    remainingMonths: loan.remainingMonths,
+    startDate: loan.startDate ?? "",
+    nextEmiDate: loan.nextEmiDate ?? "",
+    createdAt: loan.createdAt,
+    updatedAt: loan.updatedAt,
+    deleted: loan.deleted ?? false,
+    archivedAt: loan.archivedAt,
+  });
+}
+
+function normalizeLiability(item: Partial<LiabilityItem>): LiabilityItem {
+  return withTimestamps({
+    id: item.id ?? crypto.randomUUID(),
+    group: item.group ?? "",
+    name: item.name ?? "",
+    amount: item.amount ?? 0,
+    dueDate: item.dueDate ?? "",
+    deleted: item.deleted ?? false,
+    archivedAt: item.archivedAt,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  });
+}
+
+function normalizeLendItem(item: Partial<LendItem>): LendItem {
+  return withTimestamps({
+    id: item.id ?? crypto.randomUUID(),
+    name: item.name ?? "",
+    amount: item.amount ?? 0,
+    date: item.date ?? "",
+    deleted: item.deleted ?? false,
+    archivedAt: item.archivedAt,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  });
+}
+
+function normalizeCategory(category: Partial<Category>): Category {
+  return withTimestamps({
+    id: category.id ?? crypto.randomUUID(),
+    name: category.name ?? "",
+    type: category.type ?? "out",
+    deleted: category.deleted ?? false,
+    createdAt: category.createdAt,
+    updatedAt: category.updatedAt,
+  });
+}
+
+export function normalizeStore(parsed: Partial<Store>): Store {
+  const accounts = (parsed.accounts ?? INITIAL_DATA.accounts).map(normalizeAccount);
+
   return {
     ...INITIAL_DATA,
     ...parsed,
-    transactions: (parsed.transactions ?? []).map(normalizeTransaction),
-    accounts: parsed.accounts ?? INITIAL_DATA.accounts,
-    creditCards: parsed.creditCards ?? INITIAL_DATA.creditCards,
-    loans: parsed.loans ?? INITIAL_DATA.loans,
-    liabilities: parsed.liabilities ?? INITIAL_DATA.liabilities,
-    lends: parsed.lends ?? [],
-    categories: parsed.categories ?? INITIAL_DATA.categories,
+    transactions: (parsed.transactions ?? []).map((transaction) => normalizeTransaction(transaction, accounts)),
+    accounts,
+    creditCards: (parsed.creditCards ?? INITIAL_DATA.creditCards).map(normalizeCreditCard),
+    loans: (parsed.loans ?? INITIAL_DATA.loans).map(normalizeLoan),
+    liabilities: (parsed.liabilities ?? INITIAL_DATA.liabilities).map(normalizeLiability),
+    lends: (parsed.lends ?? []).map(normalizeLendItem),
+    categories: (parsed.categories ?? INITIAL_DATA.categories).map(normalizeCategory),
   };
 }
 
@@ -352,23 +606,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 export function useStore() {
   const context = useContext(StoreContext);
 
-  if (context) {
-    return context;
+  if (!context) {
+    throw new Error("useStore must be used inside StoreProvider");
   }
 
-  const [store, setStore] = useState<Store>(() => loadStore());
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STORE_KEY, JSON.stringify(store));
-    } catch (error) {
-      console.error("Failed to save MoneyMind data:", error);
-    }
-  }, [store]);
-
-  const updateStore = (updater: (prev: Store) => Store) => {
-    setStore((prev) => normalizeStore(updater(prev)));
-  };
-
-  return { store, updateStore };
+  return context;
 }

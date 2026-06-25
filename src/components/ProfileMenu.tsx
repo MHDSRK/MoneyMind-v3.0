@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useStore } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
+import { useLocation } from "wouter";
 import * as backupService from "@/lib/backupService";
 import * as googleDriveService from "@/lib/googleDriveService";
 import {
   X, ChevronDown, ChevronRight, ChevronLeft,
-  Download, Pencil, Trash2, Plus, Check, Cloud
+  Download, Pencil, Trash2, Plus, Check, Cloud, Archive
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, parseISO, startOfMonth, subMonths } from "date-fns";
@@ -102,6 +103,7 @@ function filterTx(
 // ── Main component ───────────────────────────────────────────────────────────
 export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { store, updateStore } = useStore();
+  const [, setLocation] = useLocation();
 
   // Section expansion
   const [exportOpen, setExportOpen] = useState(false);
@@ -961,6 +963,20 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-2 pb-16 space-y-1">
+        <button
+          type="button"
+          onClick={() => {
+            setLocation("/archived");
+            onClose();
+          }}
+          className="w-full flex items-center justify-between py-4 border-b border-white/5"
+        >
+          <div className="flex items-center gap-3">
+            <Archive className="w-4 h-4 text-primary" />
+            <span className="font-bold text-sm uppercase tracking-wider text-foreground">Archived</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
 
         {/* ── EXPORT section ──────────────────────────────────────────── */}
         <div>

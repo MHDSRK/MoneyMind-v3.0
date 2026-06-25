@@ -1,14 +1,21 @@
 import { formatCurrency } from "@/lib/utils";
-import { useStore, LiabilityItem } from "@/hooks/useStore";
+import { useStore, LiabilityItem, updateLiability, archiveRecord, restoreRecord } from "@/hooks/useStore";
+import { calculateMetrics } from "@/lib/calculations";
 import { useState, useRef, useEffect } from "react";
 import { ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface LiabilityRowProps {
   item: LiabilityItem;
   onChange: (val: number) => void;
+  onNameChange: (name: string) => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onDelete?: () => void;
 }
 
-function LiabilityRow({ item, onChange }: LiabilityRowProps) {
+function LiabilityRow({ item, onChange, onNameChange, onArchive, onRestore, onDelete }: LiabilityRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [val, setVal] = useState(item.amount.toString());
@@ -31,6 +38,7 @@ function LiabilityRow({ item, onChange }: LiabilityRowProps) {
 
   const handleNameBlur = () => {
     setIsNameEditing(false);
+    onNameChange(nameVal.trim() || item.name);
   };
 
   const handleAmountClick = () => {
@@ -76,11 +84,38 @@ function LiabilityRow({ item, onChange }: LiabilityRowProps) {
             className="bg-transparent border-b border-destructive w-28 text-right outline-none text-destructive font-bold text-sm" />
         </div>
       ) : (
-        <div 
-          onClick={handleAmountClick} 
-          className="text-destructive font-bold cursor-pointer text-sm hover:opacity-80 transition-opacity"
-        >
-          {formatCurrency(item.amount)}
+        <div className="flex items-center gap-2">
+          <div
+            onClick={handleAmountClick}
+            className="text-destructive font-bold cursor-pointer text-sm hover:opacity-80 transition-opacity"
+          >
+            {formatCurrency(item.amount)}
+          </div>
+          {item.archivedAt ? (
+            <button
+              type="button"
+              onClick={onRestore}
+              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+            >
+              Restore
+            </button>
+          ) : (
+            <button
+              onClick={onArchive}
+              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
+            >
+              Archive
+            </button>
+          )}
+          {item.archivedAt && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-destructive/40 text-destructive hover:bg-destructive/15 transition-colors"
+            >
+              Delete
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -92,9 +127,10 @@ interface SectionProps {
   total: number;
   children: React.ReactNode;
   onAddNew?: () => void;
+  forceOpen?: boolean;
 }
 
-function Section({ label, total, children, onAddNew }: SectionProps) {
+function Section({ label, total, children, onAddNew, forceOpen }: SectionProps) {
   const [open, setOpen] = useState(false);
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleVal, setTitleVal] = useState(label);
@@ -102,6 +138,11 @@ function Section({ label, total, children, onAddNew }: SectionProps) {
   const longPressTimer = useRef<NodeJS.Timeout>();
 
   useEffect(() => { if (isTitleEditing && titleInputRef.current) titleInputRef.current.focus(); }, [isTitleEditing]);
+  useEffect(() => {
+    if (forceOpen) {
+      setOpen(true);
+    }
+  }, [forceOpen]);
 
   const handleTitleBlur = () => {
     setIsTitleEditing(false);
@@ -160,17 +201,25 @@ function Section({ label, total, children, onAddNew }: SectionProps) {
 
 export function LiabilitiesTab() {
   const { store, updateStore } = useStore();
+  const [location] = useLocation();
+  const [showArchived, setShowArchived] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [focusedGroup, setFocusedGroup] = useState<string | null>(null);
+  const liabilityRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Define the order and list of all groups to display
-  const GROUPS = ["Regular Expenses", "Chitty", "Borrow", "Others"];
+  const GROUPS = ["Regular Expenses", "Chitty", "Borrow", "More Liabilities"];
 
   const handleLiabilityUpdate = (id: string, newAmount: number) => {
-    updateStore((prev) => ({
-      ...prev,
-      liabilities: prev.liabilities.map((l) =>
-        l.id === id ? { ...l, amount: newAmount } : l
-      ),
-    }));
+    updateStore((prev) => updateLiability(prev, id, { amount: newAmount }));
+  };
+
+  const handleLiabilityNameUpdate = (id: string, newName: string) => {
+    if (!newName || newName === store.liabilities.find((l) => l.id === id)?.name) return;
+
+    updateStore((prev) => updateLiability(prev, id, { name: newName }));
+
+    toast({ title: "Liability updated", description: `${newName} was saved.` });
   };
 
   const handleAddLiability = (group: string) => {
@@ -184,12 +233,43 @@ export function LiabilitiesTab() {
           name: "New Item",
           amount: 0,
           dueDate: "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       ],
     }));
   };
 
-  const visibleLiabilities = store.liabilities.filter((l) => !l.deleted);
+  const handleArchiveLiability = (id: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      liabilities: archiveRecord(prev.liabilities, id),
+    }));
+    toast({ title: "Liability archived", description: "The liability was archived and removed from active totals." });
+  };
+
+  const handleHardDeleteLiability = (id: string) => {
+    if (!window.confirm("Permanently delete this record? This cannot be undone.")) {
+      return;
+    }
+
+    updateStore((prev) => updateLiability(prev, id, { deleted: true }));
+    toast({ title: "Liability deleted", description: "The record was permanently deleted." });
+  };
+
+  const handleRestoreLiability = (id: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      liabilities: restoreRecord(prev.liabilities, id),
+    }));
+    toast({ title: "Liability restored", description: "The liability is active again." });
+  };
+
+  const visibleLiabilities = store.liabilities.filter(
+    (liability) =>
+      !liability.deleted &&
+      (showArchived ? Boolean(liability.archivedAt) : !liability.archivedAt)
+  );
   
   // Group liabilities by their group
   const groupedLiabilities = visibleLiabilities.reduce((acc, item) => {
@@ -205,15 +285,58 @@ export function LiabilitiesTab() {
     return (groupedLiabilities[groupName] || []).reduce((sum, item) => sum + item.amount, 0);
   };
 
-  // Calculate total liabilities
-  const totalLiabilities = visibleLiabilities.reduce((sum, l) => sum + l.amount, 0);
+  const metrics = calculateMetrics(store);
+  const totalLiabilities = metrics.totalLiabilities;
+
+  useEffect(() => {
+    if (!location.startsWith("/others")) {
+      return;
+    }
+
+    const focusId = new URLSearchParams(window.location.search).get("focus");
+    if (!focusId) {
+      return;
+    }
+
+    const target = store.liabilities.find((liability) => liability.id === focusId && !liability.deleted);
+    if (!target) {
+      return;
+    }
+
+    const shouldShowArchived = Boolean(target.archivedAt);
+    if (showArchived !== shouldShowArchived) {
+      setShowArchived(shouldShowArchived);
+    }
+
+    setFocusedGroup(target.group);
+    setHighlightedId(focusId);
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedId((previous) => (previous === focusId ? null : previous));
+    }, 2500);
+
+    window.requestAnimationFrame(() => {
+      liabilityRefs.current[focusId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    return () => window.clearTimeout(timeout);
+  }, [location, showArchived, store.liabilities]);
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-2xl font-bold text-foreground">Others</h2>
-        <div className="text-2xl font-bold text-destructive">
-          {formatCurrency(totalLiabilities)}
+        <h2 className="text-2xl font-bold text-foreground">More</h2>
+        <div className="flex flex-col items-end gap-1">
+          <div className="text-2xl font-bold text-destructive">
+            {formatCurrency(totalLiabilities)}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowArchived((value) => !value)}
+            className="text-xs text-primary underline"
+          >
+            {showArchived ? "Show Active" : "Show Archived"}
+          </button>
         </div>
       </div>
 
@@ -234,6 +357,7 @@ export function LiabilitiesTab() {
               label={group} 
               total={groupTotal}
               onAddNew={() => handleAddLiability(group)}
+              forceOpen={focusedGroup === group}
             >
               {items.length === 0 ? (
                 <div className="text-xs text-muted-foreground italic py-2">
@@ -241,11 +365,22 @@ export function LiabilitiesTab() {
                 </div>
               ) : (
                 items.map((item) => (
-                  <LiabilityRow
+                  <div
                     key={item.id}
-                    item={item}
-                    onChange={(val) => handleLiabilityUpdate(item.id, val)}
-                  />
+                    ref={(element) => {
+                      liabilityRefs.current[item.id] = element;
+                    }}
+                    className={highlightedId === item.id ? "rounded-lg ring-2 ring-primary/60" : ""}
+                  >
+                    <LiabilityRow
+                      item={item}
+                      onChange={(val) => handleLiabilityUpdate(item.id, val)}
+                      onNameChange={(name) => handleLiabilityNameUpdate(item.id, name)}
+                      onArchive={() => handleArchiveLiability(item.id)}
+                      onRestore={() => handleRestoreLiability(item.id)}
+                      onDelete={showArchived ? () => handleHardDeleteLiability(item.id) : undefined}
+                    />
+                  </div>
                 ))
               )}
             </Section>
