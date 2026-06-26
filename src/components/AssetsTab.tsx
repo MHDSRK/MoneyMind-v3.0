@@ -1,6 +1,8 @@
 import { formatCurrency } from "@/lib/utils";
 import { useStore, Account, updateAccount, archiveRecord } from "@/hooks/useStore";
 import { useState, useEffect, useRef } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { SwipeableListItem } from "@/components/SwipeableListItem";
 import { ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
@@ -91,14 +93,6 @@ function AccountRow({ account, onChange, onNameChange, onArchive }: {
           >
             {formatCurrency(account.balance)}
           </div>
-          {onArchive && (
-            <button
-              onClick={onArchive}
-              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-            >
-              Archive
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -169,12 +163,32 @@ export function AssetsTab() {
     updateStore((prev) => updateAccount(prev, id, { name: newName }));
   };
 
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [accountPendingArchive, setAccountPendingArchive] = useState<Account | null>(null);
+
   const handleArchiveAccount = (id: string) => {
     updateStore((prev) => ({
       ...prev,
       accounts: archiveRecord(prev.accounts, id),
     }));
     toast({ title: "Account archived", description: "The account was archived and removed from active totals." });
+  };
+
+  const promptArchiveAccount = (account: Account) => {
+    setAccountPendingArchive(account);
+    setArchiveDialogOpen(true);
+  };
+
+  const confirmArchiveAccount = () => {
+    if (!accountPendingArchive) return;
+    handleArchiveAccount(accountPendingArchive.id);
+    setArchiveDialogOpen(false);
+    setAccountPendingArchive(null);
+  };
+
+  const cancelArchiveAccount = () => {
+    setArchiveDialogOpen(false);
+    setAccountPendingArchive(null);
   };
 
   const handleAddAccount = (type: "cash" | "bank" | "business" | "investments" | "insurance" | "other") => {

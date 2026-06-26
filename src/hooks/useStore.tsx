@@ -51,6 +51,7 @@ export interface Account {
   balance: number;
   deleted?: boolean;
   archivedAt?: string;
+  isArchived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -71,6 +72,7 @@ export interface CreditCard {
   updatedAt?: string;
   deleted?: boolean;
   archivedAt?: string;
+  isArchived?: boolean;
 }
 
 export interface Loan {
@@ -92,6 +94,7 @@ export interface Loan {
   updatedAt?: string;
   deleted?: boolean;
   archivedAt?: string;
+  isArchived?: boolean;
 }
 
 export interface LiabilityItem {
@@ -102,6 +105,7 @@ export interface LiabilityItem {
   dueDate: string;
   deleted?: boolean;
   archivedAt?: string;
+  isArchived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -113,6 +117,7 @@ export interface LendItem {
   date: string;
   deleted?: boolean;
   archivedAt?: string;
+  isArchived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -337,6 +342,17 @@ export function updateCreditCard(store: Store, cardId: string, changes: Partial<
   };
 }
 
+export function updateCreditCardUnbilled(store: Store, cardId: string, newUnbilled: number): Store {
+  return {
+    ...store,
+    creditCards: store.creditCards.map((card) =>
+      card.id === cardId
+        ? updateRecord(card, { unbilled: Math.max(0, newUnbilled) })
+        : card
+    ),
+  };
+}
+
 export function updateLoan(store: Store, loanId: string, changes: Partial<Loan>): Store {
   return {
     ...store,
@@ -355,7 +371,221 @@ export function updateLiability(store: Store, liabilityId: string, changes: Part
   };
 }
 
-export function archiveRecord<T extends { id: string; archivedAt?: string; updatedAt?: string }>(
+function touchAccountBalance(account: Account, balance: number): Account {
+  return {
+    ...account,
+    balance,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function touchCardBalance(
+  card: CreditCard,
+  changes: Pick<CreditCard, "outstanding" | "unbilled">
+): CreditCard {
+  return {
+    ...card,
+    ...changes,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function applyTransactionEffectsToStore(store: Store, transaction: Transaction, direction: 1 | -1): Store {
+  const amount = Number(transaction.amount ?? 0);
+  const normalizedType = normalizeTransactionType(transaction.type);
+  const normalizedTransaction = {
+    ...transaction,
+    amount,
+    type: normalizedType,
+    fromAccount: transaction.fromAccount,
+    fromAccountId: transaction.fromAccountId,
+    fromCardId: transaction.fromCardId,
+    toAccount: transaction.toAccount,
+    toAccountId: transaction.toAccountId,
+    toCardId: transaction.toCardId,
+    ledger: transaction.ledger ?? "",
+    category: transaction.category ?? "",
+    notes: transaction.notes ?? "",
+    tags: transaction.tags ?? [],
+  } as Transaction;
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return store;
+  }
+
+  let nextStore = { ...store };
+
+  if (normalizedTransaction.type === "transfer") {
+    const fromAccountId = normalizeAccountReference(normalizedTransaction.fromAccountId);
+    const toAccountId = normalizeAccountReference(normalizedTransaction.toAccountId);
+
+    if (!fromAccountId || !toAccountId) {
+      return store;
+    }
+
+    const fromAccount = nextStore.accounts.find(
+      (account) => !account.deleted && !account.archivedAt && account.id === fromAccountId
+    );
+    const toAccount = nextStore.accounts.find(
+      (account) => !account.deleted && !account.archivedAt && account.id === toAccountId
+    );
+
+    if (!fromAccount || !toAccount) {
+      return store;
+    }
+
+    nextStore = {
+      ...nextStore,
+      accounts: nextStore.accounts.map((account) => {
+        if (account.id === fromAccount.id) {
+          return touchAccountBalance(account, account.balance - amount * direction);
+        }
+        if (account.id === toAccount.id) {
+          return touchAccountBalance(account, account.balance + amount * direction);
+        }
+        return account;
+      }),
+    };
+
+    return nextStore;
+  }
+
+  const sourceAccountId = normalizeAccountReference(normalizedTransaction.fromAccountId);
+  const destinationAccountId = normalizeAccountReference(normalizedTransaction.toAccountId);
+
+  if (normalizedTransaction.type === "out") {
+    const sourceAccount = nextStore.accounts.find(
+      (account) => !account.deleted && !account.archivedAt && account.id === sourceAccountId
+    );
+    const card = nextStore.creditCards.find(
+      (item) => !item.deleted && !item.archivedAt && item.id === normalizeAccountReference(normalizedTransaction.fromCardId)
+    );
+
+    if (sourceAccount) {
+      nextStore = {
+        ...nextStore,
+        accounts: nextStore.accounts.map((account) =>
+          account.id === sourceAccount.id
+            ? touchAccountBalance(account, account.balance - amount * direction)
+            : account
+        ),
+      };
+    }
+
+    if (card) {
+      nextStore = {
+        ...nextStore,
+        creditCards: nextStore.creditCards.map((existingCard) => {
+          if (existingCard.id !== card.id) return existingCard;
+          const today = new Date();
+          const currentDate = today.getDate();
+          const statementDate = existingCard.statementDate || 1;
+          const isUnbilled = currentDate >= statementDate;
+
+          return touchCardBalance(existingCard, {
+            outstanding: existingCard.outstanding + (isUnbilled ? 0 : amount * direction),
+            unbilled: (existingCard.unbilled ?? 0) + (isUnbilled ? amount * direction : 0),
+          });
+        }),
+      };
+    }
+  }
+
+  if (normalizedTransaction.type === "in") {
+    const destinationAccount = nextStore.accounts.find(
+      (account) => !account.deleted && !account.archivedAt && account.id === destinationAccountId
+    );
+    const destinationCard = nextStore.creditCards.find(
+      (item) => !item.deleted && !item.archivedAt && item.id === normalizeAccountReference(normalizedTransaction.toCardId)
+    );
+
+    if (destinationAccount) {
+      nextStore = {
+        ...nextStore,
+        accounts: nextStore.accounts.map((account) =>
+          account.id === destinationAccount.id
+            ? touchAccountBalance(account, account.balance + amount * direction)
+            : account
+        ),
+      };
+    }
+
+    if (destinationCard) {
+      nextStore = {
+        ...nextStore,
+        creditCards: nextStore.creditCards.map((existingCard) => {
+          if (existingCard.id !== destinationCard.id) return existingCard;
+          return touchCardBalance(existingCard, {
+            outstanding: existingCard.outstanding - amount * direction,
+            unbilled: existingCard.unbilled ?? 0,
+          });
+        }),
+      };
+    }
+  }
+
+  return nextStore;
+}
+
+export function deleteTransactionFromStore(store: Store, transaction: Transaction): Store {
+  const nextStore = applyTransactionEffectsToStore(store, transaction, -1);
+  return normalizeStore({
+    ...nextStore,
+    transactions: nextStore.transactions.filter((item) => item.id !== transaction.id),
+  });
+}
+
+export function restoreTransactionFromStore(store: Store, transaction: Transaction): Store {
+  const nextStore = applyTransactionEffectsToStore(store, transaction, 1);
+  return normalizeStore({
+    ...nextStore,
+    transactions: nextStore.transactions.some((item) => item.id === transaction.id)
+      ? nextStore.transactions
+      : [...nextStore.transactions, transaction],
+  });
+}
+
+export function updateTransactionInStore(
+  store: Store,
+  previousTransaction: Transaction,
+  nextTransaction: Partial<Transaction>
+): Store {
+  const nextStore = applyTransactionEffectsToStore(store, previousTransaction, -1);
+  const updatedTransaction = {
+    ...(nextTransaction as Transaction),
+    id: nextTransaction.id ?? previousTransaction.id ?? crypto.randomUUID(),
+    createdAt: nextTransaction.createdAt ?? previousTransaction.createdAt ?? new Date().toISOString(),
+    updatedAt: nextTransaction.updatedAt ?? new Date().toISOString(),
+    date: nextTransaction.date ?? previousTransaction.date ?? new Date().toISOString().split("T")[0],
+    ledger: nextTransaction.ledger ?? previousTransaction.ledger ?? "",
+    amount: Number(nextTransaction.amount ?? previousTransaction.amount ?? 0),
+    type: normalizeTransactionType(nextTransaction.type ?? previousTransaction.type ?? "out"),
+    category: nextTransaction.category ?? previousTransaction.category ?? "",
+    fromAccount: nextTransaction.fromAccount ?? previousTransaction.fromAccount,
+    fromAccountId: nextTransaction.fromAccountId ?? previousTransaction.fromAccountId,
+    fromCardId: nextTransaction.fromCardId ?? previousTransaction.fromCardId,
+    toAccount: nextTransaction.toAccount ?? previousTransaction.toAccount,
+    toAccountId: nextTransaction.toAccountId ?? previousTransaction.toAccountId,
+    toCardId: nextTransaction.toCardId ?? previousTransaction.toCardId,
+    notes: nextTransaction.notes ?? previousTransaction.notes ?? "",
+    tags: nextTransaction.tags ?? previousTransaction.tags ?? [],
+    transferResolution: nextTransaction.transferResolution ?? previousTransaction.transferResolution,
+    relatedEntityType: nextTransaction.relatedEntityType ?? previousTransaction.relatedEntityType,
+    relatedEntityId: nextTransaction.relatedEntityId ?? previousTransaction.relatedEntityId,
+    deleted: nextTransaction.deleted ?? previousTransaction.deleted,
+    archivedAt: nextTransaction.archivedAt ?? previousTransaction.archivedAt,
+  } as Transaction;
+
+  const appliedStore = applyTransactionEffectsToStore(nextStore, updatedTransaction, 1);
+  return normalizeStore({
+    ...appliedStore,
+    transactions: appliedStore.transactions.filter((item) => item.id !== previousTransaction.id).concat(updatedTransaction),
+  });
+}
+
+export function archiveRecord<
+  T extends { id: string; archivedAt?: string; updatedAt?: string; isArchived?: boolean }
+>(
   items: T[],
   id: string
 ): T[] {
@@ -365,6 +595,7 @@ export function archiveRecord<T extends { id: string; archivedAt?: string; updat
       ? {
           ...item,
           archivedAt,
+          isArchived: true,
           updatedAt: archivedAt,
         }
       : item
@@ -372,7 +603,7 @@ export function archiveRecord<T extends { id: string; archivedAt?: string; updat
 }
 
 export function restoreRecord<
-  T extends { id: string; archivedAt?: string; updatedAt?: string }
+  T extends { id: string; archivedAt?: string; updatedAt?: string; isArchived?: boolean }
 >(items: T[], id: string): T[] {
   const updatedAt = new Date().toISOString();
 
@@ -381,6 +612,7 @@ export function restoreRecord<
       ? {
           ...item,
           archivedAt: undefined,
+          isArchived: false,
           updatedAt,
         }
       : item
@@ -451,6 +683,7 @@ function normalizeAccount(account: Partial<Account>): Account {
     balance: account.balance ?? 0,
     deleted: account.deleted ?? false,
     archivedAt: account.archivedAt,
+    isArchived: account.isArchived ?? false,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   });
@@ -473,6 +706,7 @@ function normalizeCreditCard(card: Partial<CreditCard>): CreditCard {
     updatedAt: card.updatedAt,
     deleted: card.deleted ?? false,
     archivedAt: card.archivedAt,
+    isArchived: card.isArchived ?? false,
   });
 }
 
@@ -496,6 +730,7 @@ function normalizeLoan(loan: Partial<Loan>): Loan {
     updatedAt: loan.updatedAt,
     deleted: loan.deleted ?? false,
     archivedAt: loan.archivedAt,
+    isArchived: loan.isArchived ?? false,
   });
 }
 
@@ -508,6 +743,7 @@ function normalizeLiability(item: Partial<LiabilityItem>): LiabilityItem {
     dueDate: item.dueDate ?? "",
     deleted: item.deleted ?? false,
     archivedAt: item.archivedAt,
+    isArchived: item.isArchived ?? false,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   });
@@ -521,6 +757,7 @@ function normalizeLendItem(item: Partial<LendItem>): LendItem {
     date: item.date ?? "",
     deleted: item.deleted ?? false,
     archivedAt: item.archivedAt,
+    isArchived: item.isArchived ?? false,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   });

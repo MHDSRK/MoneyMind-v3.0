@@ -1,8 +1,10 @@
 import { formatCurrency } from "@/lib/utils";
-import { useStore, LiabilityItem, updateLiability, archiveRecord } from "@/hooks/useStore";
-import { calculateMetrics } from "@/lib/calculations";
+import { useStore, LiabilityItem, updateLiability, archiveRecord, restoreRecord } from "@/hooks/useStore";
+import { getLiabilityScopeSummary, getLiabilityGroupTotals } from "@/lib/calculations";
 import { useState, useRef, useEffect } from "react";
-import { ChevronUp, ChevronDown, Plus, History } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { SwipeableListItem } from "@/components/SwipeableListItem";
+import { ChevronUp, ChevronDown, Plus, History, ArchiveRestore } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
@@ -11,12 +13,12 @@ interface LiabilityRowProps {
   item: LiabilityItem;
   onChange: (val: number) => void;
   onNameChange: (name: string) => void;
-  onArchive: () => void;
-  onHistory: () => void;
+  onHistory?: () => void;
+  showHistory?: boolean;
   onDelete?: () => void;
 }
 
-function LiabilityRow({ item, onChange, onNameChange, onArchive, onHistory, onDelete }: LiabilityRowProps) {
+function LiabilityRow({ item, onChange, onNameChange, onHistory, showHistory = true, onDelete }: LiabilityRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [val, setVal] = useState(item.amount.toString());
@@ -76,7 +78,7 @@ function LiabilityRow({ item, onChange, onNameChange, onArchive, onHistory, onDe
           {item.name}
         </span>
       )}
-      {!isEditing && (
+      {!isEditing && showHistory && onHistory && (
         <button
           type="button"
           onClick={onHistory}
@@ -102,12 +104,6 @@ function LiabilityRow({ item, onChange, onNameChange, onArchive, onHistory, onDe
           >
             {formatCurrency(item.amount)}
           </div>
-          <button
-              onClick={onArchive}
-              className="px-1.5 py-0.5 rounded text-[10px] font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-            >
-              Archive
-            </button>
         </div>
       )}
     </div>
@@ -197,6 +193,7 @@ export function LiabilitiesTab() {
   const [paymentSheetItemId, setPaymentSheetItemId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [focusedGroup, setFocusedGroup] = useState<string | null>(null);
+  const [showArchivedExpenses, setShowArchivedExpenses] = useState(false);
   const liabilityRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Define the order and list of all groups to display
@@ -232,12 +229,40 @@ export function LiabilitiesTab() {
     }));
   };
 
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [liabilityPendingArchive, setLiabilityPendingArchive] = useState<LiabilityItem | null>(null);
+
   const handleArchiveLiability = (id: string) => {
     updateStore((prev) => ({
       ...prev,
       liabilities: archiveRecord(prev.liabilities, id),
     }));
     toast({ title: "Liability archived", description: "The liability was archived and removed from active totals." });
+  };
+
+  const handleRestoreLiability = (id: string) => {
+    updateStore((prev) => ({
+      ...prev,
+      liabilities: restoreRecord(prev.liabilities, id),
+    }));
+    toast({ title: "Regular expense restored", description: "The item is active again and included in totals." });
+  };
+
+  const promptArchiveLiability = (item: LiabilityItem) => {
+    setLiabilityPendingArchive(item);
+    setArchiveDialogOpen(true);
+  };
+
+  const confirmArchiveLiability = () => {
+    if (!liabilityPendingArchive) return;
+    handleArchiveLiability(liabilityPendingArchive.id);
+    setArchiveDialogOpen(false);
+    setLiabilityPendingArchive(null);
+  };
+
+  const cancelArchiveLiability = () => {
+    setArchiveDialogOpen(false);
+    setLiabilityPendingArchive(null);
   };
 
   const handleHardDeleteLiability = (id: string) => {
@@ -253,7 +278,6 @@ export function LiabilitiesTab() {
     (liability) => !liability.deleted && !liability.archivedAt
   );
   
-  // Group liabilities by their group
   const groupedLiabilities = visibleLiabilities.reduce((acc, item) => {
     if (!acc[item.group]) {
       acc[item.group] = [];
@@ -262,13 +286,13 @@ export function LiabilitiesTab() {
     return acc;
   }, {} as Record<string, LiabilityItem[]>);
 
-  // Calculate totals for each group
-  const getGroupTotal = (groupName: string) => {
-    return (groupedLiabilities[groupName] || []).reduce((sum, item) => sum + item.amount, 0);
-  };
+  const archivedRegularExpenses = store.liabilities
+    .filter((item) => item.group === "Regular Expenses" && !item.deleted && Boolean(item.archivedAt))
+    .sort((a, b) => new Date(b.archivedAt ?? 0).getTime() - new Date(a.archivedAt ?? 0).getTime());
 
-  const metrics = calculateMetrics(store);
-  const totalLiabilities = metrics.totalLiabilities;
+  const groupTotals = getLiabilityGroupTotals(store);
+  const scopedLiabilitySummary = getLiabilityScopeSummary(store, highlightedId, focusedGroup);
+  const totalLiabilities = scopedLiabilitySummary.amount;
 
   useEffect(() => {
     if (!location.startsWith("/others")) {
@@ -317,7 +341,7 @@ export function LiabilitiesTab() {
       <div className="space-y-3">
         {GROUPS.map((group) => {
           const items = groupedLiabilities[group] || [];
-          const groupTotal = getGroupTotal(group);
+          const groupTotal = groupTotals[group] ?? 0;
           
           return (
             <Section 
@@ -325,7 +349,7 @@ export function LiabilitiesTab() {
               label={group} 
               total={groupTotal}
               onAddNew={() => handleAddLiability(group)}
-              forceOpen={focusedGroup === group}
+              forceOpen={group === "Regular Expenses" || focusedGroup === group}
             >
               {items.length === 0 ? (
                 <div className="text-xs text-muted-foreground italic py-2">
@@ -340,13 +364,21 @@ export function LiabilitiesTab() {
                     }}
                     className={highlightedId === item.id ? "rounded-lg ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
                   >
-                    <LiabilityRow
-                      item={item}
-                      onChange={(val) => handleLiabilityUpdate(item.id, val)}
-                      onNameChange={(name) => handleLiabilityNameUpdate(item.id, name)}
-                      onArchive={() => handleArchiveLiability(item.id)}
-                      onHistory={() => setPaymentSheetItemId(item.id)}
-                    />
+                          <SwipeableListItem
+                      className="rounded-lg"
+                      actionLabel="Archive"
+                      onAction={() => promptArchiveLiability(item)}
+                    >
+                      <div className="glass-card overflow-hidden">
+                        <LiabilityRow
+                          item={item}
+                          onChange={(val) => handleLiabilityUpdate(item.id, val)}
+                          onNameChange={(name) => handleLiabilityNameUpdate(item.id, name)}
+                          onHistory={() => setPaymentSheetItemId(item.id)}
+                          showHistory={item.group !== "Regular Expenses"}
+                        />
+                      </div>
+                    </SwipeableListItem>
                   </div>
                 ))
               )}
@@ -354,6 +386,67 @@ export function LiabilitiesTab() {
           );
         })}
       </div>
+
+      {archivedRegularExpenses.length > 0 && (
+        <div className="glass-card overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowArchivedExpenses((prev) => !prev)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left"
+          >
+            <div>
+              <p className="text-sm font-semibold text-white">Archived ({archivedRegularExpenses.length})</p>
+              <p className="text-xs text-muted-foreground">Restore archived recurring expenses.</p>
+            </div>
+            {showArchivedExpenses ? (
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            )}
+          </button>
+
+          {showArchivedExpenses && (
+            <div className="space-y-2 border-t border-white/10 p-4">
+              {archivedRegularExpenses.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{item.name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Archived {item.archivedAt ? new Date(item.archivedAt).toLocaleDateString() : "unknown date"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRestoreLiability(item.id)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-white/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+                  >
+                    <ArchiveRestore className="w-3.5 h-3.5" />
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveLiability()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive "{liabilityPendingArchive?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This recurring expense will no longer be included in future calculations.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelArchiveLiability}>Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmArchiveLiability} className="bg-destructive text-white hover:bg-destructive/90">
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {paymentSheetItemId && (() => {
         const item = store.liabilities.find((l) => l.id === paymentSheetItemId);

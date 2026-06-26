@@ -151,24 +151,41 @@ export function applyTransactionEffects(
     }
 
     if (card) {
-      const today = new Date();
-      const currentDate = today.getDate();
-      const statementDate = card.statementDate || 1;
-      const isUnbilled = currentDate >= statementDate;
+      const isUnbilledQuickAdd =
+        normalizedTransaction.category === "Unbilled" ||
+        normalizedTransaction.tags.includes("unbilled");
 
-      nextStore = {
-        ...nextStore,
-        creditCards: nextStore.creditCards.map((existingCard) => {
-          if (existingCard.id !== card.id) return existingCard;
-          return touchCardBalance(existingCard, {
-            outstanding:
-              existingCard.outstanding + (isUnbilled ? 0 : amount * direction),
-            unbilled:
-              (existingCard.unbilled ?? 0) +
-              (isUnbilled ? amount * direction : 0),
-          });
-        }),
-      };
+      if (isUnbilledQuickAdd) {
+        nextStore = {
+          ...nextStore,
+          creditCards: nextStore.creditCards.map((existingCard) => {
+            if (existingCard.id !== card.id) return existingCard;
+            return touchCardBalance(existingCard, {
+              outstanding: existingCard.outstanding,
+              unbilled: (existingCard.unbilled ?? 0) + amount * direction,
+            });
+          }),
+        };
+      } else {
+        const today = new Date();
+        const currentDate = today.getDate();
+        const statementDate = card.statementDate || 1;
+        const isUnbilled = currentDate >= statementDate;
+
+        nextStore = {
+          ...nextStore,
+          creditCards: nextStore.creditCards.map((existingCard) => {
+            if (existingCard.id !== card.id) return existingCard;
+            return touchCardBalance(existingCard, {
+              outstanding:
+                existingCard.outstanding + (isUnbilled ? 0 : amount * direction),
+              unbilled:
+                (existingCard.unbilled ?? 0) +
+                (isUnbilled ? amount * direction : 0),
+            });
+          }),
+        };
+      }
     }
   }
 
@@ -215,6 +232,27 @@ export function applyTransactionEffects(
   }
 
   return nextStore;
+}
+
+export function createUnbilledTransaction(
+  store: Store,
+  cardId: string,
+  amount: number,
+  notes?: string
+): Store {
+  return createTransaction(store, {
+    id: crypto.randomUUID(),
+    date: new Date().toISOString().split("T")[0],
+    type: "out",
+    amount,
+    ledger: "Quick Add",
+    category: "Unbilled",
+    fromCardId: cardId,
+    notes: notes ?? "Quick add unbilled expense",
+    tags: ["unbilled"],
+    relatedEntityType: "credit-card",
+    relatedEntityId: cardId,
+  });
 }
 
 export function createTransaction(

@@ -1,4 +1,5 @@
 import { Store, Transaction } from "@/hooks/useStore";
+import { differenceInCalendarDays } from "date-fns";
 
 /**
  * Automatic calculations for all financial metrics
@@ -40,6 +41,119 @@ function normalizeAccountReference(value?: string) {
   return value?.replace(/^account:/, "").replace(/^card:/, "");
 }
 
+function isTrackingAccount(account: { name?: string }): boolean {
+  const normalizedName = account.name?.trim().toLowerCase();
+  return normalizedName === "lent" || normalizedName === "tracking" || normalizedName === "tracking-only";
+}
+
+function isTrackingTransaction(_store: Store, transaction: Transaction): boolean {
+  const trackingTerms = ["lent", "tracking", "tracking-only"];
+  const candidates = [
+    transaction.category,
+    transaction.ledger,
+    transaction.account,
+    transaction.fromAccount,
+    transaction.toAccount,
+    transaction.notes,
+  ];
+
+  return candidates.some((value) => {
+    if (!value) return false;
+    const normalized = value.trim().toLowerCase();
+    return trackingTerms.some((term) => normalized === term || normalized.includes(term));
+  });
+}
+
+export interface UpcomingCreditCardDue {
+  id: string;
+  name: string;
+  outstanding: number;
+  nextDueDate: string;
+  daysLeft: number;
+}
+
+export interface LiabilityScopeSummary {
+  kind: "item" | "group" | "all";
+  amount: number;
+  id?: string;
+  group?: string;
+}
+
+export function getUpcomingCreditCardDues(
+  store: Store,
+  options: { referenceDate?: Date; daysAhead?: number } = {}
+): UpcomingCreditCardDue[] {
+  const referenceDate = new Date(options.referenceDate ?? new Date());
+  referenceDate.setHours(0, 0, 0, 0);
+  const daysAhead = options.daysAhead ?? 5;
+
+  return store.creditCards
+    .filter((card) => !card.deleted && !card.archivedAt && card.outstanding > 0)
+    .map((card) => {
+      if (!card.nextDueDate) return null;
+
+      const dueDate = new Date(card.nextDueDate);
+      if (Number.isNaN(dueDate.getTime())) return null;
+
+      const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
+      if (daysLeft < 0 || daysLeft > daysAhead) return null;
+
+      return {
+        id: card.id,
+        name: card.name,
+        outstanding: card.outstanding,
+        nextDueDate: card.nextDueDate,
+        daysLeft,
+      };
+    })
+    .filter((item): item is UpcomingCreditCardDue => Boolean(item))
+    .sort((a, b) => {
+      if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+export function getLiabilityGroupTotals(store: Store): Record<string, number> {
+  return store.liabilities.reduce((totals, item) => {
+    if (item.deleted || item.archivedAt) return totals;
+    const current = totals[item.group] ?? 0;
+    totals[item.group] = current + item.amount;
+    return totals;
+  }, {} as Record<string, number>);
+}
+
+export function getCreditCardAvailableAmount(card: { creditLimit: number; outstanding: number; unbilled?: number }): number {
+  return card.creditLimit - card.outstanding - (card.unbilled ?? 0);
+}
+
+export function getLiabilityScopeSummary(
+  store: Store,
+  selectedLiabilityId: string | null,
+  selectedGroup: string | null
+): LiabilityScopeSummary {
+  const visibleLiabilities = store.liabilities.filter((item) => !item.deleted && !item.archivedAt);
+
+  if (selectedLiabilityId) {
+    const selectedItem = visibleLiabilities.find((item) => item.id === selectedLiabilityId);
+    if (selectedItem) {
+      return { kind: "item", amount: selectedItem.amount, id: selectedItem.id, group: selectedItem.group };
+    }
+  }
+
+  if (selectedGroup) {
+    const groupTotal = visibleLiabilities
+      .filter((item) => item.group === selectedGroup)
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    if (groupTotal > 0 || visibleLiabilities.some((item) => item.group === selectedGroup)) {
+      return { kind: "group", amount: groupTotal, group: selectedGroup };
+    }
+  }
+
+  const totalLiabilities = visibleLiabilities.reduce((sum, item) => sum + item.amount, 0);
+  return { kind: "all", amount: totalLiabilities };
+}
+
 export function calculateMetrics(store: Store): FinancialMetrics {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -51,27 +165,27 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Account Balances by Type
   // ─────────────────────────────────────────────────────────────────────────────
   const cashBalance = store.accounts
-    .filter((a) => a.type === "cash" && !a.deleted && !a.archivedAt)
+    .filter((a) => a.type === "cash" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
     .reduce((sum, a) => sum + a.balance, 0);
 
   const bankBalance = store.accounts
-    .filter((a) => a.type === "bank" && !a.deleted && !a.archivedAt)
+    .filter((a) => a.type === "bank" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
     .reduce((sum, a) => sum + a.balance, 0);
 
   const businessBalance = store.accounts
-    .filter((a) => a.type === "business" && !a.deleted && !a.archivedAt)
+    .filter((a) => a.type === "business" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
     .reduce((sum, a) => sum + a.balance, 0);
 
   const investmentsBalance = store.accounts
-    .filter((a) => a.type === "investments" && !a.deleted && !a.archivedAt)
+    .filter((a) => a.type === "investments" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
     .reduce((sum, a) => sum + a.balance, 0);
 
   const insuranceBalance = store.accounts
-    .filter((a) => a.type === "insurance" && !a.deleted && !a.archivedAt)
+    .filter((a) => a.type === "insurance" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
     .reduce((sum, a) => sum + a.balance, 0);
 
   const otherAssetsBalance = store.accounts
-    .filter((a) => a.type === "other" && !a.deleted && !a.archivedAt)
+    .filter((a) => a.type === "other" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
     .reduce((sum, a) => sum + a.balance, 0);
 
   const totalAssets =
@@ -126,7 +240,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Today's Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
   const todayTransactions = store.transactions.filter(
-    (t) => !t.deleted && !t.archivedAt && t.date === todayStr
+    (t) => !t.deleted && !t.archivedAt && t.date === todayStr && !isTrackingTransaction(store, t)
   );
 
   const todayIncome = todayTransactions
@@ -143,7 +257,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Monthly Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
   const monthTransactions = store.transactions.filter(
-    (t) => !t.deleted && !t.archivedAt && t.date >= monthStartStr && t.date <= todayStr
+    (t) => !t.deleted && !t.archivedAt && t.date >= monthStartStr && t.date <= todayStr && !isTrackingTransaction(store, t)
   );
 
   const monthlyIncome = monthTransactions

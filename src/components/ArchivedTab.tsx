@@ -5,10 +5,15 @@ import {
   CreditCard,
   HandCoins,
   Landmark,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   restoreRecord,
+  updateAccount,
+  updateCreditCard,
+  updateLoan,
+  updateLiability,
   useStore,
 } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";

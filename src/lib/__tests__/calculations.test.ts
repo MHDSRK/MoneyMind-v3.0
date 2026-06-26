@@ -3,6 +3,10 @@ import {
   calculateMetrics,
   FinancialMetrics,
   getAccountBalanceHistory,
+  getUpcomingCreditCardDues,
+  getLiabilityScopeSummary,
+  getLiabilityGroupTotals,
+  getCreditCardAvailableAmount,
 } from "@/lib/calculations";
 import {
   createTransaction as applyTransaction,
@@ -50,18 +54,18 @@ describe("Financial Calculations", () => {
       expect(metrics.totalAssets).toBe(1000);
     });
 
-    it("should include other accounts in total assets and net worth", () => {
+    it("should exclude tracking-only Lent accounts from asset totals and net worth", () => {
       const store = createStore({
         accounts: [
           { id: "1", name: "Bank", type: "bank", balance: 1000, deleted: false },
-          { id: "2", name: "Other", type: "other", balance: 300, deleted: false },
+          { id: "2", name: "Lent", type: "other", balance: 300, deleted: false },
         ],
       });
 
       const metrics = calculateMetrics(store);
-      expect(metrics.otherAssetsBalance).toBe(300);
-      expect(metrics.totalAssets).toBe(1300);
-      expect(metrics.netWorth).toBe(1300);
+      expect(metrics.otherAssetsBalance).toBe(0);
+      expect(metrics.totalAssets).toBe(1000);
+      expect(metrics.netWorth).toBe(1000);
     });
 
     it("should calculate balances by account type", () => {
@@ -251,6 +255,117 @@ describe("Financial Calculations", () => {
       const metrics = calculateMetrics(store);
       expect(metrics.creditCardTotalLimit).toBe(5000);
       expect(metrics.creditCardOutstanding).toBe(1000);
+    });
+  });
+
+  describe("Shared due-date and liability scope helpers", () => {
+    it("returns upcoming credit card dues within the requested window", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "cc1",
+            name: "Card A",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 10000,
+            outstanding: 1200,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-04T00:00:00.000Z",
+            deleted: false,
+          },
+          {
+            id: "cc2",
+            name: "Card B",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 5000,
+            outstanding: 800,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-10T00:00:00.000Z",
+            deleted: false,
+          },
+          {
+            id: "cc3",
+            name: "Card C",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 5000,
+            outstanding: 0,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-04T00:00:00.000Z",
+            deleted: false,
+          },
+        ],
+      });
+
+      const dues = getUpcomingCreditCardDues(store, {
+        referenceDate: new Date("2026-02-01T00:00:00.000Z"),
+        daysAhead: 5,
+      });
+
+      expect(dues).toHaveLength(1);
+      expect(dues[0].id).toBe("cc1");
+      expect(dues[0].daysLeft).toBe(3);
+    });
+
+    it("uses the selected liability item amount as the scoped summary", () => {
+      const store = createStore({
+        liabilities: [
+          {
+            id: "liab1",
+            group: "Borrow",
+            name: "Friend Loan",
+            amount: 12000,
+            dueDate: "2026-02-01",
+            deleted: false,
+          },
+          {
+            id: "liab2",
+            group: "Borrow",
+            name: "Other Debt",
+            amount: 4000,
+            dueDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+      });
+
+      const scope = getLiabilityScopeSummary(store, "liab1", null);
+
+      expect(scope).toMatchObject({ kind: "item", amount: 12000 });
+    });
+
+    it("uses the selected group total when no liability item is selected", () => {
+      const store = createStore({
+        liabilities: [
+          {
+            id: "liab1",
+            group: "Borrow",
+            name: "Friend Loan",
+            amount: 12000,
+            dueDate: "2026-02-01",
+            deleted: false,
+          },
+          {
+            id: "liab2",
+            group: "More Liabilities",
+            name: "Other Debt",
+            amount: 4000,
+            dueDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+      });
+
+      const scope = getLiabilityScopeSummary(store, null, "Borrow");
+
+      expect(scope).toMatchObject({ kind: "group", amount: 12000 });
     });
   });
 
@@ -580,7 +695,7 @@ describe("Financial Calculations", () => {
       expect(metrics.netWorth).toBe(-440000);
     });
 
-    it("should include other-account balances in net worth calculations", () => {
+    it("should exclude Lent tracking balances from net worth calculations", () => {
       const store = createStore({
         accounts: [
           { id: "1", name: "Bank", type: "bank", balance: 100000, deleted: false },
@@ -604,7 +719,7 @@ describe("Financial Calculations", () => {
       });
 
       const metrics = calculateMetrics(store);
-      expect(metrics.netWorth).toBe(140000); // 150000 - 10000
+      expect(metrics.netWorth).toBe(90000); // 100000 - 10000
     });
   });
 
@@ -1193,6 +1308,51 @@ describe("Financial Calculations", () => {
   });
 
   describe("Transaction Calculations", () => {
+    it("should exclude tracking-only transactions from today's and monthly totals", () => {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const store = createStore({
+        transactions: [
+          {
+            id: "tx1",
+            date: todayStr,
+            ledger: "Salary",
+            amount: 1000,
+            type: "in",
+            category: "Salary",
+            notes: "",
+            tags: [],
+          },
+          {
+            id: "tx2",
+            date: todayStr,
+            ledger: "Lent",
+            amount: 200,
+            type: "out",
+            category: "Lent",
+            notes: "",
+            tags: [],
+          },
+          {
+            id: "tx3",
+            date: todayStr,
+            ledger: "Rent",
+            amount: 300,
+            type: "out",
+            category: "Rent",
+            notes: "",
+            tags: [],
+          },
+        ],
+      });
+
+      const metrics = calculateMetrics(store);
+      expect(metrics.todayIncome).toBe(1000);
+      expect(metrics.todayExpense).toBe(300);
+      expect(metrics.monthlyIncome).toBe(1000);
+      expect(metrics.monthlyExpense).toBe(300);
+    });
+
     it("should calculate today's income and expense", () => {
       const today = new Date();
       const todayStr = today.toISOString().split("T")[0];

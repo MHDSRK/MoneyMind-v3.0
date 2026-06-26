@@ -2,6 +2,8 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { useStore, updateLoan, archiveRecord } from "@/hooks/useStore";
 import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { SwipeableListItem } from "@/components/SwipeableListItem";
 import { Plus, Pencil, History } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -102,12 +104,32 @@ export function LoansTab() {
     setEditingLoanId(null);
   };
 
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [loanPendingArchive, setLoanPendingArchive] = useState<ReturnType<typeof store.loans[number]> | null>(null);
+
   const handleArchiveLoan = (loanId: string) => {
     updateStore((prev) => ({
       ...prev,
       loans: archiveRecord(prev.loans, loanId),
     }));
     toast({ title: "Loan archived", description: "The loan was archived and removed from active totals." });
+  };
+
+  const promptArchiveLoan = (loan: ReturnType<typeof store.loans[number]>) => {
+    setLoanPendingArchive(loan);
+    setArchiveDialogOpen(true);
+  };
+
+  const confirmArchiveLoan = () => {
+    if (!loanPendingArchive) return;
+    handleArchiveLoan(loanPendingArchive.id);
+    setArchiveDialogOpen(false);
+    setLoanPendingArchive(null);
+  };
+
+  const cancelArchiveLoan = () => {
+    setArchiveDialogOpen(false);
+    setLoanPendingArchive(null);
   };
 
   const handleHardDeleteLoan = (loanId: string) => {
@@ -160,13 +182,17 @@ export function LoansTab() {
             const isEditing = editingLoanId === loan.id;
 
             return (
-              <div 
-                key={loan.id} 
-                ref={(element) => {
-                  loanRefs.current[loan.id] = element;
-                }}
+              <SwipeableListItem
+                key={loan.id}
                 className={cn("glass-card p-4 space-y-3", highlightedId === loan.id && "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]")}
+                actionLabel="Archive"
+                onAction={() => promptArchiveLoan(loan)}
               >
+                <div
+                  ref={(element) => {
+                    loanRefs.current[loan.id] = element;
+                  }}
+                >
                 {/* Header with Edit Button */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
@@ -190,11 +216,18 @@ export function LoansTab() {
                     ) : (
                       <>
                         <p className="font-bold text-foreground">{loan.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(loan.principal)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{loan.lender || "Lender not set"}</p>
                       </>
                     )}
                   </div>
-                  
+
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Original</p>
+                    <p className="font-medium text-sm text-muted-foreground">{formatCurrency(loan.principal)}</p>
+                    <p className="text-xs text-muted-foreground mt-2">Outstanding</p>
+                    <p className="font-bold text-sm text-destructive">{formatCurrency(loan.outstanding)}</p>
+                  </div>
+
                   {isEditing ? (
                     <button
                       onClick={() => handleEditSave(loan.id)}
@@ -215,22 +248,18 @@ export function LoansTab() {
 
                 {/* Display Mode: Details Grid */}
                 {!isEditing && (
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="border-t border-white/10 pt-3 grid grid-cols-3 gap-4 text-xs">
                     <div>
-                      <span className="text-muted-foreground">Outstanding</span>
-                      <p className={cn("font-bold", loan.outstanding < 0 ? "text-destructive" : "text-destructive")}>{formatCurrency(loan.outstanding)}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">EMI/Month</span>
-                      <p className="text-primary font-bold">{formatCurrency(loan.emiAmount)}</p>
+                      <span className="text-muted-foreground">EMI / Month</span>
+                      <p className="font-bold text-sm mt-1">{formatCurrency(loan.emiAmount)}</p>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Next EMI</span>
-                      <p className="text-sm">{loan.nextEmiDate ? format(new Date(loan.nextEmiDate), "d MMM") : "-"}</p>
+                      <p className="font-bold text-sm mt-1">{loan.nextEmiDate ? format(new Date(loan.nextEmiDate), "d MMM") : "-"}</p>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Remaining</span>
-                      <p className="text-sm">{loan.emiCount - loan.paidCount} months</p>
+                      <p className="font-bold text-sm mt-1">{loan.emiCount - loan.paidCount} months</p>
                     </div>
                   </div>
                 )}
@@ -314,13 +343,6 @@ export function LoansTab() {
                     >
                       <History className="w-3 h-3" /> History
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleArchiveLoan(loan.id)}
-                      className="px-2 py-1 rounded text-xs font-semibold border border-primary/40 text-primary hover:bg-primary/15 transition-colors"
-                    >
-                      Archive
-                    </button>
                   </div>
                 )}
               </div>
@@ -330,6 +352,21 @@ export function LoansTab() {
       )}
 
       {/* Add New Button */}
+      <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveLoan()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive "{loanPendingArchive?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>Archived items will no longer appear in active lists.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelArchiveLoan}>Cancel</AlertDialogCancel>
+            <AlertDialogAction type="button" onClick={confirmArchiveLoan} className="bg-destructive text-white hover:bg-destructive/90">
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <button
         onClick={handleAddLoan}
         className="w-full py-3 flex items-center justify-center gap-2 bg-primary/10 border border-primary/30 rounded-xl text-primary font-bold text-sm hover:bg-primary/20 transition-colors"

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useStore, Transaction, TransactionType } from "@/hooks/useStore";
-import { calculateMetrics } from "@/lib/calculations";
+import { calculateMetrics, getUpcomingCreditCardDues } from "@/lib/calculations";
 import { createTransaction } from "@/lib/transactionEffects";
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { parseISO, format, differenceInCalendarDays } from "date-fns";
+import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -26,36 +26,13 @@ export function HomeTab() {
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Calculate all metrics
-  const metrics = calculateMetrics(store);
+  // Calculate all financial metrics, excluding tracking-only items.
+  const financialMetrics = calculateMetrics(store);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const todayNet = metrics.todayIncome - metrics.todayExpense;
+  const todayNet = financialMetrics.todayIncome - financialMetrics.todayExpense;
 
-  // Upcoming credit card due dates
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const upcomingDues = store.creditCards
-    .filter((cc) => !cc.deleted && cc.outstanding > 0)
-    .filter((cc) => {
-      if (!cc.nextDueDate) return false;
-      try {
-        const diff = differenceInCalendarDays(parseISO(cc.nextDueDate), today);
-        return diff >= 0 && diff <= 5;
-      } catch {
-        return false;
-      }
-    })
-    .sort((a, b) => {
-      try {
-        return differenceInCalendarDays(
-          parseISO(a.nextDueDate || ""),
-          parseISO(b.nextDueDate || "")
-        );
-      } catch {
-        return 0;
-      }
-    });
+  const upcomingDues = getUpcomingCreditCardDues(store);
 
   const handleSave = () => {
     if (!amount || !ledger || !category || !txType) return;
@@ -192,12 +169,12 @@ export function HomeTab() {
         <h2
           className={cn(
             "text-5xl font-bold tracking-tight mb-6",
-            metrics.netWorth >= 0
+            financialMetrics.netWorth >= 0
               ? "text-primary neon-text"
               : "text-destructive"
           )}
         >
-          {formatCurrency(metrics.netWorth)}
+          {formatCurrency(financialMetrics.netWorth)}
         </h2>
         <div className="flex w-full justify-between px-4">
           <div className="flex flex-col items-center">
@@ -205,7 +182,7 @@ export function HomeTab() {
               Assets
             </span>
             <span className="text-[#34d399] font-medium">
-              {formatCurrency(metrics.totalAssets)}
+              {formatCurrency(financialMetrics.totalAssets)}
             </span>
           </div>
           <div className="h-10 w-px bg-white/10" />
@@ -214,7 +191,7 @@ export function HomeTab() {
               Liabilities
             </span>
             <span className="text-destructive font-medium">
-              {formatCurrency(metrics.totalLiabilities)}
+              {formatCurrency(financialMetrics.totalLiabilities)}
             </span>
           </div>
         </div>
@@ -252,36 +229,30 @@ export function HomeTab() {
           </div>
         ) : (
           <div className="divide-y divide-white/5">
-            {upcomingDues.map((cc) => {
-              const daysLeft = differenceInCalendarDays(
-                parseISO(cc.nextDueDate || ""),
-                today
-              );
-              return (
-                <div key={cc.id} className="flex items-center px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{cc.name}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {daysLeft === 0
-                        ? "Due today"
-                        : daysLeft === 1
-                        ? "Tomorrow"
-                        : `In ${daysLeft} days`}
-                      {" · "}
-                      {format(parseISO(cc.nextDueDate || ""), "d MMM")}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "font-bold text-sm shrink-0",
-                      daysLeft === 0 ? "text-destructive" : "text-orange-400"
-                    )}
-                  >
-                    {formatCurrency(cc.outstanding)}
-                  </span>
+            {upcomingDues.map((cc) => (
+              <div key={cc.id} className="flex items-center px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{cc.name}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {cc.daysLeft === 0
+                      ? "Due today"
+                      : cc.daysLeft === 1
+                      ? "Tomorrow"
+                      : `In ${cc.daysLeft} days`}
+                    {" · "}
+                    {format(new Date(cc.nextDueDate), "d MMM")}
+                  </p>
                 </div>
-              );
-            })}
+                <span
+                  className={cn(
+                    "font-bold text-sm shrink-0",
+                    cc.daysLeft === 0 ? "text-destructive" : "text-orange-400"
+                  )}
+                >
+                  {formatCurrency(cc.outstanding)}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
