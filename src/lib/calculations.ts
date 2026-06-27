@@ -222,9 +222,6 @@ export function calculateMetrics(store: Store): FinancialMetrics {
     .filter((l) => !l.deleted && !l.archivedAt)
     .reduce((sum, l) => sum + l.principal, 0);
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Total Liabilities (Credit Cards + Loans + Manual Liabilities)
-  // ─────────────────────────────────────────────────────────────────────────────
   const manualLiabilities = store.liabilities
     .filter((item) => !item.deleted && !item.archivedAt)
     .reduce((sum, item) => sum + item.amount, 0);

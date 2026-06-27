@@ -143,7 +143,6 @@ export function CreditCardsTab() {
                 { label: "Credit Limit", value: formatCurrency(selectedCard.creditLimit) },
                 { label: "Outstanding", value: formatCurrency(selectedCard.outstanding) },
                 { label: "Unbilled", value: formatCurrency(selectedCard.unbilled ?? 0) },
-                { label: "Available", value: formatCurrency(cardAvailable(selectedCard)) },
                 { label: "Due Day", value: String(selectedCard.dueDate) },
                 { label: "Next Bill", value: selectedCard.nextDueDate ? format(new Date(selectedCard.nextDueDate), "d MMM yyyy") : "Not set" },
               ]
@@ -177,7 +176,20 @@ export function CreditCardsTab() {
           ) : null
         }
         onClose={() => setSelectedCard(null)}
-      />
+      >
+        {selectedCard ? (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Available</p>
+              <p className="mt-2 text-3xl font-semibold text-primary">{formatCurrency(cardAvailable(selectedCard))}</p>
+            </div>
+            <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive/80">Due Amount</p>
+              <p className="mt-1 text-2xl font-semibold text-destructive">{formatCurrency(selectedCard.outstanding + (selectedCard.unbilled ?? 0))}</p>
+            </div>
+          </div>
+        ) : null}
+      </RecordDetailsDialog>
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveCard()}>
         <AlertDialogContent>

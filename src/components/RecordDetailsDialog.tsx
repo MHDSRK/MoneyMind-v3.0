@@ -21,16 +21,16 @@ export function RecordDetailsDialog({ open, title, description, details, actions
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
+        {children ? <div className="mt-4 space-y-4">{children}</div> : null}
+
         <div className="mt-4 space-y-3">
           {details.map((detail) => (
-            <div key={detail.label} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{detail.label}</p>
-              <p className="mt-2 text-sm font-semibold text-foreground">{detail.value}</p>
+            <div key={detail.label} className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">{detail.label}</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">{detail.value}</p>
             </div>
           ))}
         </div>
-
-        {children ? <div className="mt-4">{children}</div> : null}
 
         <DialogFooter className="mt-4 gap-2">
           <div className="flex-1">{actions}</div>

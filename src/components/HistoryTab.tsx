@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useStore, HistoryEvent } from "@/hooks/useStore";
 import { formatDistanceToNowStrict, parseISO } from "date-fns";
 import { Activity, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const EVENT_LABELS: Record<string, { label: string; accent: string }> = {
   create: { label: "Created", accent: "text-emerald-400" },
@@ -25,7 +26,8 @@ function getEventLabel(event: HistoryEvent) {
 }
 
 export default function HistoryTab() {
-  const { store } = useStore();
+  const { store, updateStore } = useStore();
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   const recentHistory = useMemo(
     () =>
@@ -38,11 +40,21 @@ export default function HistoryTab() {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-24 pt-5">
-      <div>
-        <h1 className="text-xl font-bold text-white">History</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Recent activity from the last few days, including creates, edits, archives, restores, and deletes.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-white">History</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Recent activity from the last few days, including creates, edits, archives, restores, and deletes.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setClearDialogOpen(true)}
+          disabled={store.history.length === 0}
+          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear History
+        </button>
       </div>
 
       {recentHistory.length === 0 ? (
@@ -83,6 +95,29 @@ export default function HistoryTab() {
           })}
         </div>
       )}
+      <AlertDialog open={clearDialogOpen} onOpenChange={(open) => !open && setClearDialogOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear activity history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Clearing history will remove every activity record from the timeline.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClearDialogOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => {
+                updateStore((prev) => ({ ...prev, history: [] }));
+                setClearDialogOpen(false);
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Clear History
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

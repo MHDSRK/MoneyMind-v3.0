@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useStore, Account, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
-import { MasterListSection } from "@/components/MasterListSection";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -36,6 +36,7 @@ export function AssetsTab() {
     })
     .reduce((sum, account) => sum + account.balance, 0);
   const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal + nonTrackingOtherTotal;
+  const [expandedSection, setExpandedSection] = useState<string | undefined>("bank");
 
   useEffect(() => {
     if (!location.startsWith("/assets")) {
@@ -98,115 +99,147 @@ export function AssetsTab() {
         </div>
       </div>
 
-      <MasterListSection label="Bank & Cash" total={bankTotal}>
-        {bankAccounts.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No bank or cash accounts yet.</div>
-        ) : (
-          bankAccounts.map((account) => (
-            <div
-              key={account.id}
-              ref={(element) => { accountRefs.current[account.id] = element; }}
-              className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-            >
-              <MasterListRow
-                name={account.name}
-                subtitle={account.type === "cash" ? "Cash" : "Bank"}
-                amount={account.balance}
-                onClick={() => setSelectedAccount(account)}
-                onArchive={() => promptArchiveAccount(account)}
-              />
-            </div>
-          ))
-        )}
-      </MasterListSection>
+      <Accordion type="single" collapsible value={expandedSection} onValueChange={setExpandedSection} className="space-y-3">
+        <AccordionItem value="bank">
+          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span>Bank & Cash</span>
+            <span className="text-sm font-bold">{formatCurrency(bankTotal)}</span>
+          </AccordionTrigger>
+          <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+            {bankAccounts.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground">No bank or cash accounts yet.</div>
+            ) : (
+              bankAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  ref={(element) => { accountRefs.current[account.id] = element; }}
+                  className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                >
+                  <MasterListRow
+                    name={account.name}
+                    subtitle={account.type === "cash" ? "Cash" : "Bank"}
+                    amount={account.balance}
+                    onClick={() => setSelectedAccount(account)}
+                    onArchive={() => promptArchiveAccount(account)}
+                  />
+                </div>
+              ))
+            )}
+          </AccordionContent>
+        </AccordionItem>
 
-      <MasterListSection label="Business" total={businessTotal}>
-        {businessAccounts.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No business accounts yet.</div>
-        ) : (
-          businessAccounts.map((account) => (
-            <div
-              key={account.id}
-              ref={(element) => { accountRefs.current[account.id] = element; }}
-              className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-            >
-              <MasterListRow
-                name={account.name}
-                subtitle="Business"
-                amount={account.balance}
-                onClick={() => setSelectedAccount(account)}
-                onArchive={() => promptArchiveAccount(account)}
-              />
-            </div>
-          ))
-        )}
-      </MasterListSection>
+        <AccordionItem value="business">
+          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span>Business</span>
+            <span className="text-sm font-bold">{formatCurrency(businessTotal)}</span>
+          </AccordionTrigger>
+          <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+            {businessAccounts.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground">No business accounts yet.</div>
+            ) : (
+              businessAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  ref={(element) => { accountRefs.current[account.id] = element; }}
+                  className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                >
+                  <MasterListRow
+                    name={account.name}
+                    subtitle="Business"
+                    amount={account.balance}
+                    onClick={() => setSelectedAccount(account)}
+                    onArchive={() => promptArchiveAccount(account)}
+                  />
+                </div>
+              ))
+            )}
+          </AccordionContent>
+        </AccordionItem>
 
-      <MasterListSection label="Investments" total={investmentTotal}>
-        {investmentAccounts.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No investment accounts yet.</div>
-        ) : (
-          investmentAccounts.map((account) => (
-            <div
-              key={account.id}
-              ref={(element) => { accountRefs.current[account.id] = element; }}
-              className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-            >
-              <MasterListRow
-                name={account.name}
-                subtitle="Investments"
-                amount={account.balance}
-                onClick={() => setSelectedAccount(account)}
-                onArchive={() => promptArchiveAccount(account)}
-              />
-            </div>
-          ))
-        )}
-      </MasterListSection>
+        <AccordionItem value="investments">
+          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span>Investments</span>
+            <span className="text-sm font-bold">{formatCurrency(investmentTotal)}</span>
+          </AccordionTrigger>
+          <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+            {investmentAccounts.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground">No investment accounts yet.</div>
+            ) : (
+              investmentAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  ref={(element) => { accountRefs.current[account.id] = element; }}
+                  className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                >
+                  <MasterListRow
+                    name={account.name}
+                    subtitle="Investments"
+                    amount={account.balance}
+                    onClick={() => setSelectedAccount(account)}
+                    onArchive={() => promptArchiveAccount(account)}
+                  />
+                </div>
+              ))
+            )}
+          </AccordionContent>
+        </AccordionItem>
 
-      <MasterListSection label="Insurance" total={insuranceTotal}>
-        {insuranceAccounts.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No insurance accounts yet.</div>
-        ) : (
-          insuranceAccounts.map((account) => (
-            <div
-              key={account.id}
-              ref={(element) => { accountRefs.current[account.id] = element; }}
-              className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-            >
-              <MasterListRow
-                name={account.name}
-                subtitle="Insurance"
-                amount={account.balance}
-                onClick={() => setSelectedAccount(account)}
-                onArchive={() => promptArchiveAccount(account)}
-              />
-            </div>
-          ))
-        )}
-      </MasterListSection>
+        <AccordionItem value="insurance">
+          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span>Insurance</span>
+            <span className="text-sm font-bold">{formatCurrency(insuranceTotal)}</span>
+          </AccordionTrigger>
+          <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+            {insuranceAccounts.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground">No insurance accounts yet.</div>
+            ) : (
+              insuranceAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  ref={(element) => { accountRefs.current[account.id] = element; }}
+                  className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                >
+                  <MasterListRow
+                    name={account.name}
+                    subtitle="Insurance"
+                    amount={account.balance}
+                    onClick={() => setSelectedAccount(account)}
+                    onArchive={() => promptArchiveAccount(account)}
+                  />
+                </div>
+              ))
+            )}
+          </AccordionContent>
+        </AccordionItem>
 
-      <MasterListSection label="Lent" total={otherTotal}>
-        {otherAccounts.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">No lent accounts yet.</div>
-        ) : (
-          otherAccounts.map((account) => (
-            <div
-              key={account.id}
-              ref={(element) => { accountRefs.current[account.id] = element; }}
-              className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-            >
-              <MasterListRow
-                name={account.name}
-                subtitle="Lent"
-                amount={account.balance}
-                onClick={() => setSelectedAccount(account)}
-                onArchive={() => promptArchiveAccount(account)}
-              />
-            </div>
-          ))
-        )}
-      </MasterListSection>
+        <AccordionItem value="lent">
+          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span>Lent</span>
+            <span className="text-sm font-bold">{formatCurrency(otherTotal)}</span>
+          </AccordionTrigger>
+          <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+            {otherAccounts.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground">No lent accounts yet.</div>
+            ) : (
+              otherAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  ref={(element) => { accountRefs.current[account.id] = element; }}
+                  className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                >
+                  <MasterListRow
+                    name={account.name}
+                    subtitle="Lent"
+                    amount={account.balance}
+                    onClick={() => setSelectedAccount(account)}
+                    onArchive={() => promptArchiveAccount(account)}
+                  />
+                </div>
+              ))
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <RecordDetailsDialog
         open={Boolean(selectedAccount)}

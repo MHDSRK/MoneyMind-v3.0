@@ -105,8 +105,6 @@ export function LoansTab() {
           selectedLoan
             ? [
                 { label: "Lender", value: selectedLoan.lender || "Not set" },
-                { label: "Principal", value: formatCurrency(selectedLoan.principal) },
-                { label: "Outstanding", value: formatCurrency(selectedLoan.outstanding) },
                 { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount) },
                 { label: "Remaining", value: `${selectedLoan.emiCount - selectedLoan.paidCount} months` },
                 { label: "Next EMI", value: selectedLoan.nextEmiDate ? format(new Date(selectedLoan.nextEmiDate), "d MMM yyyy") : "Not set" },
@@ -134,7 +132,20 @@ export function LoansTab() {
           ) : null
         }
         onClose={() => setSelectedLoan(null)}
-      />
+      >
+        {selectedLoan ? (
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Original Loan Amount</p>
+              <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(selectedLoan.principal)}</p>
+            </div>
+            <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive/80">Outstanding Balance</p>
+              <p className="mt-1 text-2xl font-semibold text-destructive">{formatCurrency(selectedLoan.outstanding)}</p>
+            </div>
+          </div>
+        ) : null}
+      </RecordDetailsDialog>
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveLoan()}>
         <AlertDialogContent>

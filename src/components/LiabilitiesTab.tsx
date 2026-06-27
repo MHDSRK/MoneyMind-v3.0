@@ -2,10 +2,10 @@
 import { useStore, LiabilityItem, archiveRecord, restoreRecord } from "@/hooks/useStore";
 import { getLiabilityGroupTotals } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/utils";
-import { MasterListSection } from "@/components/MasterListSection";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -37,6 +37,7 @@ export function LiabilitiesTab() {
   const archivedRegularExpenses = store.liabilities
     .filter((item) => item.group === "Regular Expenses" && !item.deleted && Boolean(item.archivedAt))
     .sort((a, b) => new Date(b.archivedAt ?? 0).getTime() - new Date(a.archivedAt ?? 0).getTime());
+  const [expandedGroup, setExpandedGroup] = useState<string | undefined>(GROUPS[0]);
 
   useEffect(() => {
     if (!location.startsWith("/others")) return;
@@ -94,36 +95,42 @@ export function LiabilitiesTab() {
         <div className="text-2xl font-bold text-destructive">{formatCurrency(totalLiabilities)}</div>
       </div>
 
-      <div className="space-y-4">
+      <Accordion type="single" collapsible value={expandedGroup} onValueChange={setExpandedGroup} className="space-y-3">
         {GROUPS.map((group) => {
           const items = groupedLiabilities[group] || [];
           const groupTotal = groupTotals[group] ?? 0;
 
           return (
-            <MasterListSection key={group} label={group} total={groupTotal}>
-              {items.length === 0 ? (
-                <div className="px-4 py-4 text-sm text-muted-foreground">No items yet.</div>
-              ) : (
-                items.map((item) => (
-                  <div
-                    key={item.id}
-                    ref={(element) => { liabilityRefs.current[item.id] = element; }}
-                    className={highlightedId === item.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-                  >
-                    <MasterListRow
-                      name={item.name}
-                      subtitle={item.dueDate ? `Due ${item.dueDate}` : item.group}
-                      amount={item.amount}
-                      onClick={() => setSelectedLiability(item)}
-                      onArchive={() => promptArchiveLiability(item)}
-                    />
-                  </div>
-                ))
-              )}
-            </MasterListSection>
+            <AccordionItem key={group} value={group}>
+              <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+                <span>{group}</span>
+                <span className="text-sm font-bold">{formatCurrency(groupTotal)}</span>
+              </AccordionTrigger>
+              <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+                {items.length === 0 ? (
+                  <div className="px-4 py-4 text-sm text-muted-foreground">No items yet.</div>
+                ) : (
+                  items.map((item) => (
+                    <div
+                      key={item.id}
+                      ref={(element) => { liabilityRefs.current[item.id] = element; }}
+                      className={highlightedId === item.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                    >
+                      <MasterListRow
+                        name={item.name}
+                        subtitle={item.dueDate ? `Due ${item.dueDate}` : item.group}
+                        amount={item.amount}
+                        onClick={() => setSelectedLiability(item)}
+                        onArchive={() => promptArchiveLiability(item)}
+                      />
+                    </div>
+                  ))
+                )}
+              </AccordionContent>
+            </AccordionItem>
           );
         })}
-      </div>
+      </Accordion>
 
       {archivedRegularExpenses.length > 0 && (
         <div className="glass-card overflow-hidden">
