@@ -1,5 +1,6 @@
-import { Transaction, Store } from "@/hooks/useStore";
-import { startOfMonth, endOfMonth, subMonths, format, parseISO, eachMonthOfInterval } from "date-fns";
+import { Transaction } from "@/hooks/useStore";
+import { isTrackingTransaction } from "./calculations";
+import { startOfMonth, endOfMonth, subMonths, format, eachMonthOfInterval } from "date-fns";
 
 export function calculateCashFlow(
   transactions: Transaction[],
@@ -7,7 +8,7 @@ export function calculateCashFlow(
   endDate: string
 ) {
   const filtered = transactions.filter((transaction) => {
-    if (transaction.deleted || transaction.type === "transfer") {
+    if (transaction.deleted || transaction.type === "transfer" || isTrackingTransaction(transaction)) {
       return false;
     }
 
@@ -77,6 +78,7 @@ export function calculateCategoryBreakdown(
   const filtered = transactions.filter(
     (tx) =>
       !tx.deleted &&
+      !isTrackingTransaction(tx) &&
       tx.type === type &&
       tx.date >= startDate &&
       tx.date <= endDate

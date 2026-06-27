@@ -46,7 +46,7 @@ function isTrackingAccount(account: { name?: string }): boolean {
   return normalizedName === "lent" || normalizedName === "tracking" || normalizedName === "tracking-only";
 }
 
-function isTrackingTransaction(_store: Store, transaction: Transaction): boolean {
+export function isTrackingTransaction(transaction: Transaction): boolean {
   const trackingTerms = ["lent", "tracking", "tracking-only"];
   const candidates = [
     transaction.category,
@@ -240,7 +240,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Today's Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
   const todayTransactions = store.transactions.filter(
-    (t) => !t.deleted && !t.archivedAt && t.date === todayStr && !isTrackingTransaction(store, t)
+    (t) => !t.deleted && !t.archivedAt && t.date === todayStr && !isTrackingTransaction(t)
   );
 
   const todayIncome = todayTransactions
@@ -257,7 +257,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Monthly Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
   const monthTransactions = store.transactions.filter(
-    (t) => !t.deleted && !t.archivedAt && t.date >= monthStartStr && t.date <= todayStr && !isTrackingTransaction(store, t)
+    (t) => !t.deleted && !t.archivedAt && t.date >= monthStartStr && t.date <= todayStr && !isTrackingTransaction(t)
   );
 
   const monthlyIncome = monthTransactions

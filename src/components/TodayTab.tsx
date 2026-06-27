@@ -2,6 +2,7 @@ import { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useStore, Transaction, deleteTransactionFromStore, restoreTransactionFromStore, updateTransactionInStore } from "@/hooks/useStore";
 import { createTransaction } from "@/lib/transactionEffects";
+import { isTrackingTransaction } from "@/lib/calculations";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -35,7 +36,9 @@ export function TodayTab() {
   const [notes, setNotes] = useState("");
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const todaysTx = store.transactions.filter((t) => !t.deleted && t.date.startsWith(todayStr));
+  const todaysTx = store.transactions.filter(
+    (t) => !t.deleted && !t.archivedAt && t.date.startsWith(todayStr) && !isTrackingTransaction(t)
+  );
 
   const getAccountName = (
     accountId?: string,

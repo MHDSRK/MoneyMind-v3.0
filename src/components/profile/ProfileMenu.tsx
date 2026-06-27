@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { X, Archive, History } from "lucide-react";
+import { X, Archive, History, Pencil } from "lucide-react";
 import { ExportSection } from "./ExportSection";
 import { BackupSection } from "./BackupSection";
 import { GoogleDriveSection } from "./GoogleDriveSection";
@@ -23,6 +23,19 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-2 pb-16 space-y-1">
+        {/* Edit */}
+        <button
+          type="button"
+          onClick={() => {
+            setLocation("/edit");
+            onClose();
+          }}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-white transition-colors hover:bg-white/10"
+        >
+          <Pencil className="h-4 w-4 text-primary" />
+          Edit records
+        </button>
+
         {/* Archived */}
         <button
           type="button"

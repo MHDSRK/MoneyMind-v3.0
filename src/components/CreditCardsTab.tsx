@@ -1,11 +1,14 @@
-import { useState, useRef, useEffect } from "react";
-import { useStore, CreditCard, updateCreditCard, archiveRecord } from "@/hooks/useStore";
-import { formatCurrency, cn } from "@/lib/utils";
-import { calculateMetrics, getCreditCardAvailableAmount } from "@/lib/calculations";
+﻿import { useEffect, useRef, useState } from "react";
+import { useStore, CreditCard, archiveRecord } from "@/hooks/useStore";
+import { formatCurrency } from "@/lib/utils";
 import { createUnbilledTransaction } from "@/lib/transactionEffects";
+import { getCreditCardAvailableAmount } from "@/lib/calculations";
+import { MasterListSection } from "@/components/MasterListSection";
+import { MasterListRow } from "@/components/MasterListRow";
+import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { SwipeableListItem } from "@/components/SwipeableListItem";
-import { Plus, Pencil, History } from "lucide-react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { X } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -14,38 +17,32 @@ import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
 export function CreditCardsTab() {
   const { store, updateStore } = useStore();
   const [location] = useLocation();
-  const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editProvider, setEditProvider] = useState("");
-  const [editCardType, setEditCardType] = useState("");
-  const [editLimit, setEditLimit] = useState("");
-  const [editOutstanding, setEditOutstanding] = useState("");
-  const [editUnbilled, setEditUnbilled] = useState("");
-  const [editDueDate, setEditDueDate] = useState("");
-  const [editNextDueDate, setEditNextDueDate] = useState("");
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [cardPendingArchive, setCardPendingArchive] = useState<CreditCard | null>(null);
   const [paymentSheetCardId, setPaymentSheetCardId] = useState<string | null>(null);
-  const [quickAddAmounts, setQuickAddAmounts] = useState<Record<string, string>>({});
+  const [quickAddCardId, setQuickAddCardId] = useState<string | null>(null);
+  const [quickAddAmount, setQuickAddAmount] = useState("");
+  const [quickAddNotes, setQuickAddNotes] = useState("");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  const visibleCards = store.creditCards.filter((card) => !card.deleted && !card.archivedAt);
+  const totalLimit = visibleCards.reduce((sum, card) => sum + card.creditLimit, 0);
+  const totalOutstanding = visibleCards.reduce((sum, card) => sum + card.outstanding, 0);
+  const totalUnbilled = visibleCards.reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
+  const totalAvailable = totalLimit - totalOutstanding - totalUnbilled;
+
   useEffect(() => {
-    if (!location.startsWith("/cards")) {
-      return;
-    }
+    if (!location.startsWith("/cards")) return;
 
     const focusId = new URLSearchParams(window.location.search).get("focus");
-    if (!focusId) {
-      return;
-    }
+    if (!focusId) return;
 
     const target = store.creditCards.find((card) => card.id === focusId && !card.deleted);
-    if (!target) {
-      return;
-    }
+    if (!target) return;
 
-    setEditingCardId(null);
     setHighlightedId(focusId);
-
     const timeout = window.setTimeout(() => {
       setHighlightedId((previous) => (previous === focusId ? null : previous));
     }, 2500);
@@ -57,81 +54,6 @@ export function CreditCardsTab() {
     return () => window.clearTimeout(timeout);
   }, [location, store.creditCards]);
 
-  const handleQuickAddUnbilled = (cardId: string) => {
-    const rawValue = quickAddAmounts[cardId];
-    const parsedValue = Number(rawValue);
-
-    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
-      toast({ title: "Invalid amount", description: "Enter a positive amount to add.", variant: "destructive" });
-      return;
-    }
-
-    updateStore((prev) => createUnbilledTransaction(prev, cardId, parsedValue));
-    setQuickAddAmounts((prev) => ({ ...prev, [cardId]: "" }));
-    toast({ title: "Unbilled added", description: `${formatCurrency(parsedValue)} was added to this card.` });
-  };
-
-  const handleAddCard = () => {
-    updateStore((prev) => ({
-      ...prev,
-      creditCards: [
-        ...prev.creditCards,
-        {
-          id: crypto.randomUUID(),
-          name: "New Card",
-          provider: "",
-          cardType: "",
-          creditLimit: 0,
-          outstanding: 0,
-          unbilled: 0,
-          statementDate: 1,
-          dueDate: 15,
-          nextDueDate: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    }));
-    toast({ title: "Card added", description: "Your card was added successfully." });
-  };
-
-  const handleEditStart = (card: CreditCard) => {
-    setEditingCardId(card.id);
-    setEditName(card.name);
-    setEditProvider(card.provider);
-    setEditCardType(card.cardType || "");
-    setEditLimit(card.creditLimit.toString());
-    setEditOutstanding(card.outstanding.toString());
-    setEditUnbilled((card.unbilled ?? 0).toString());
-    setEditDueDate(card.dueDate.toString());
-    setEditNextDueDate(card.nextDueDate ? new Date(card.nextDueDate).toISOString().split('T')[0] : "");
-  };
-
-  const handleEditSave = (cardId: string) => {
-    updateStore((prev) => updateCreditCard(prev, cardId, {
-      name: editName,
-      provider: editProvider,
-      cardType: editCardType,
-      creditLimit: parseInt(editLimit) || 0,
-      outstanding: parseInt(editOutstanding) || 0,
-      unbilled: parseInt(editUnbilled) || 0,
-      dueDate: parseInt(editDueDate) || 15,
-      nextDueDate: editNextDueDate ? new Date(editNextDueDate).toISOString() : undefined,
-    }));
-    setEditingCardId(null);
-    toast({ title: "Card updated", description: "The card details were saved." });
-  };
-
-  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [cardPendingArchive, setCardPendingArchive] = useState<CreditCard | null>(null);
-
-  const handleArchiveCard = (cardId: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      creditCards: archiveRecord(prev.creditCards, cardId),
-    }));
-    toast({ title: "Card archived", description: "The card was archived and removed from active totals." });
-  };
 
   const promptArchiveCard = (card: CreditCard) => {
     setCardPendingArchive(card);
@@ -140,7 +62,9 @@ export function CreditCardsTab() {
 
   const confirmArchiveCard = () => {
     if (!cardPendingArchive) return;
-    handleArchiveCard(cardPendingArchive.id);
+
+    updateStore((prev) => ({ ...prev, creditCards: archiveRecord(prev.creditCards, cardPendingArchive.id) }));
+    toast({ title: "Card archived", description: "The card was archived and removed from active totals." });
     setArchiveDialogOpen(false);
     setCardPendingArchive(null);
   };
@@ -150,306 +74,116 @@ export function CreditCardsTab() {
     setCardPendingArchive(null);
   };
 
-  const handleHardDeleteCard = (cardId: string) => {
-    if (!window.confirm("Permanently delete this record? This cannot be undone.")) {
+  const openQuickAdd = (cardId: string) => {
+    setQuickAddCardId(cardId);
+    setQuickAddAmount("");
+    setQuickAddNotes("");
+  };
+
+  const closeQuickAdd = () => setQuickAddCardId(null);
+
+  const confirmQuickAdd = () => {
+    if (!quickAddCardId) return;
+    const amount = Number(quickAddAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: "Invalid amount", description: "Enter a positive amount.", variant: "destructive" });
       return;
     }
 
-    updateStore((prev) => updateCreditCard(prev, cardId, { deleted: true }));
-    toast({ title: "Card deleted", description: "The record was permanently deleted." });
+    updateStore((prev) => createUnbilledTransaction(prev, quickAddCardId, amount, quickAddNotes));
+    toast({ title: "Unbilled expense added", description: "Added to card unbilled total." });
+    closeQuickAdd();
   };
 
-  const visibleCards = store.creditCards.filter(
-    (card) => !card.deleted && !card.archivedAt
-  );
-  const metrics = calculateMetrics(store);
-  const totalLimit = metrics.creditCardTotalLimit;
-  const totalOutstanding = metrics.creditCardOutstanding;
-  const totalUnbilled = metrics.creditCardUnbilled;
-  const totalAvailable = totalLimit - totalOutstanding - totalUnbilled;
+  const cardAvailable = (card: CreditCard) => Math.max(0, getCreditCardAvailableAmount(card));
 
   return (
-    <div className="pb-32 px-4 pt-24 space-y-6">
-      {/* Summary */}
-      <div className="glass-card p-6 flex flex-col items-center text-center">
-        <span className="text-muted-foreground text-xs font-bold tracking-wider mb-2">TOTAL AVAILABLE</span>
-        <h2
-          className={cn(
-            "text-5xl font-bold tracking-tight mb-6",
-            totalLimit - totalOutstanding - totalUnbilled >= 0 ? "text-primary neon-text" : "text-destructive"
-          )}
-        >
+    <div className="pb-32 px-4 pt-24 space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Credit Cards</h2>
+          <p className="text-sm text-muted-foreground">Tap a card to view details, swipe left to archive.</p>
+        </div>
+        <div className={totalAvailable < 0 ? "text-destructive text-2xl font-bold" : "text-primary neon-text text-2xl font-bold"}>
           {formatCurrency(totalAvailable)}
-        </h2>
-        <div className="flex w-full justify-between px-4 text-xs">
-          <div className="flex flex-col items-center">
-            <span className="text-muted-foreground uppercase mb-1">Credit Limit</span>
-            <span className="text-[#34d399] font-medium">{formatCurrency(totalLimit)}</span>
-          </div>
-          <div className="h-10 w-px bg-white/10" />
-          <div className="flex flex-col items-center">
-            <span className="text-muted-foreground uppercase mb-1">Due Amount</span>
-            <span className="text-destructive font-medium">{formatCurrency(totalOutstanding)}</span>
-          </div>
-          <div className="h-10 w-px bg-white/10" />
-          <div className="flex flex-col items-center">
-            <span className="text-muted-foreground uppercase mb-1">Unbilled</span>
-            <span className="text-orange-400 font-medium">{formatCurrency(totalUnbilled)}</span>
-          </div>
         </div>
       </div>
 
-      {/* Cards List */}
-      {visibleCards.length === 0 ? (
-        <div className="glass-card p-8 text-center text-muted-foreground italic text-sm">
-          No credit cards yet. Click the ADD NEW button below to add one.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {visibleCards.map((card) => {
-            const isEditing = editingCardId === card.id;
-            const available = getCreditCardAvailableAmount(card);
+      <MasterListSection label="Credit Cards" total={totalAvailable}>
+        {visibleCards.length === 0 ? (
+          <div className="px-4 py-4 text-sm text-muted-foreground">No active credit cards yet. Add one to begin.</div>
+        ) : (
+          visibleCards.map((card) => (
+            <div
+              key={card.id}
+              ref={(element) => { cardRefs.current[card.id] = element; }}
+              className={highlightedId === card.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+            >
+              <MasterListRow
+                name={card.name}
+                subtitle={card.provider || card.cardType || "Credit card"}
+                amount={cardAvailable(card)}
+                onClick={() => setSelectedCard(card)}
+                onArchive={() => promptArchiveCard(card)}
+              />
+            </div>
+          ))
+        )}
+      </MasterListSection>
 
-            return (
-              <SwipeableListItem
-                key={card.id}
-                className={cn("glass-card overflow-hidden", highlightedId === card.id && "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]")}
-                actionLabel="Archive"
-                onAction={() => promptArchiveCard(card)}
+      <RecordDetailsDialog
+        open={Boolean(selectedCard)}
+        title={selectedCard?.name ?? "Card details"}
+        description="Review credit card values and open payment history."
+        details={
+          selectedCard
+            ? [
+                { label: "Provider", value: selectedCard.provider || "Not set" },
+                { label: "Card Type", value: selectedCard.cardType || "Not set" },
+                { label: "Credit Limit", value: formatCurrency(selectedCard.creditLimit) },
+                { label: "Outstanding", value: formatCurrency(selectedCard.outstanding) },
+                { label: "Unbilled", value: formatCurrency(selectedCard.unbilled ?? 0) },
+                { label: "Available", value: formatCurrency(cardAvailable(selectedCard)) },
+                { label: "Due Day", value: String(selectedCard.dueDate) },
+                { label: "Next Bill", value: selectedCard.nextDueDate ? format(new Date(selectedCard.nextDueDate), "d MMM yyyy") : "Not set" },
+              ]
+            : []
+        }
+        actions={
+          selectedCard ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => openQuickAdd(selectedCard.id)}
+                className="rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary border border-primary/20 hover:bg-primary/20"
               >
-                <div
-                  ref={(element) => {
-                    cardRefs.current[card.id] = element;
-                  }}
-                >
-                {/* Card Header */}
-                <div className="w-full text-left p-4 flex items-start justify-between hover:bg-white/5 transition-colors">
-                  {/* Edit mode: show editable fields */}
-                  {isEditing && (
-                    <div className="flex-1 space-y-2 mr-3">
-                      <input 
-                        type="text" 
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        placeholder="Card Name"
-                        className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm text-foreground outline-none font-bold"
-                      />
-                      <input 
-                        type="text" 
-                        value={editProvider}
-                        onChange={(e) => setEditProvider(e.target.value)}
-                        placeholder="Provider"
-                        className="w-full bg-black/20 border border-primary/50 rounded px-2 py-1 text-xs text-foreground outline-none"
-                      />
-                      <input 
-                        type="text" 
-                        value={editCardType}
-                        onChange={(e) => setEditCardType(e.target.value)}
-                        placeholder="Card Type (e.g., VISA SIGNATURE)"
-                        className="w-full bg-black/20 border border-primary/50 rounded px-2 py-1 text-xs text-foreground outline-none"
-                      />
-                    </div>
-                  )}
+                Add Unbilled
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentSheetCardId(selectedCard.id)}
+                className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-foreground border border-white/10 hover:bg-white/10"
+              >
+                History
+              </button>
+              <button
+                type="button"
+                onClick={() => promptArchiveCard(selectedCard)}
+                className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-white hover:bg-destructive/90"
+              >
+                Archive
+              </button>
+            </div>
+          ) : null
+        }
+        onClose={() => setSelectedCard(null)}
+      />
 
-                  {/* Display mode: show card info */}
-                  {!isEditing && (
-                    <div className="flex-1 text-left">
-                      <p className="font-bold text-foreground">{card.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {card.provider && card.cardType ? `${card.provider} • ${card.cardType}` : (card.cardType || card.provider || "No type set")}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-2 ml-3 shrink-0">
-                    {isEditing ? (
-                      <button
-                        onClick={() => handleEditSave(card.id)}
-                        className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-bold hover:opacity-90"
-                      >
-                        Save
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleEditStart(card)}
-                        className="p-1 hover:bg-primary/20 rounded transition-colors"
-                        title="Edit card details"
-                      >
-                        <Pencil className="w-4 h-4 text-primary" />
-                      </button>
-                    )}
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Limit / Available</p>
-                        <p className={cn(
-                          "font-bold text-sm",
-                          available < 0 ? "text-destructive" : ""
-                        )}>
-                          {formatCurrency(card.creditLimit)} / {formatCurrency(Math.max(0, available))}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-white/10 p-4 space-y-3">
-                    {isEditing ? (
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs text-muted-foreground">Credit Limit</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm">₹</span>
-                            <input
-                              type="number"
-                              value={editLimit}
-                              onChange={(e) => setEditLimit(e.target.value)}
-                              className="flex-1 bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground">Available Amount</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm">₹</span>
-                            <input
-                              type="number"
-                              value={Math.max(0, parseInt(editLimit || "0") - parseInt(editOutstanding || "0") - parseInt(editUnbilled || "0")).toString()}
-                              readOnly
-                              className="flex-1 bg-black/20 border border-white/10 rounded px-2 py-1 text-sm outline-none opacity-60"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground">Due Amount</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm">₹</span>
-                            <input
-                              type="number"
-                              value={editOutstanding}
-                              onChange={(e) => setEditOutstanding(e.target.value)}
-                              className="flex-1 bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground">Due Date (Day of Month)</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="31"
-                            value={editDueDate}
-                            onChange={(e) => setEditDueDate(e.target.value)}
-                            className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none mt-1"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground">Unbilled</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm">₹</span>
-                            <input
-                              type="number"
-                              value={editUnbilled}
-                              onChange={(e) => setEditUnbilled(e.target.value)}
-                              className="flex-1 bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-muted-foreground">Next Bill Date</label>
-                          <input
-                            type="date"
-                            value={editNextDueDate}
-                            onChange={(e) => setEditNextDueDate(e.target.value)}
-                            className="w-full bg-black/20 border border-primary rounded px-2 py-1 text-sm outline-none mt-1"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-3 gap-4 text-xs">
-                          <div>
-                            <span className="text-muted-foreground">Due Amount</span>
-                            <p className={cn("font-bold text-sm mt-1", card.outstanding < 0 ? "text-destructive" : "text-destructive")}>
-                              {formatCurrency(card.outstanding ?? 0)}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Due Date</span>
-                            <p className="font-bold text-sm mt-1">{card.dueDate ?? 0}</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Unbilled</span>
-                            <p className="font-bold text-sm mt-1 text-orange-400">{formatCurrency(card.unbilled ?? 0)}</p>
-                          </div>
-                        </div>
-
-                        <div className="border-t border-white/10 pt-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground text-sm">₹</span>
-                            <input
-                              type="number"
-                              min="0"
-                              value={quickAddAmounts[card.id] ?? ""}
-                              onChange={(e) =>
-                                setQuickAddAmounts((prev) => ({ ...prev, [card.id]: e.target.value }))
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  handleQuickAddUnbilled(card.id);
-                                }
-                              }}
-                              placeholder="Quick add"
-                              className="flex-1 bg-black/20 border border-white/10 rounded-lg p-2 text-sm outline-none focus:border-primary"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleQuickAddUnbilled(card.id)}
-                              className="p-2 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/20 transition-colors"
-                              aria-label="Add unbilled amount"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="border-t border-white/10 pt-3 flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Next Bill Date</span>
-                          <span className="font-bold text-sm">
-                            {card.nextDueDate ? format(new Date(card.nextDueDate), "d MMM yyyy") : "Not set"}
-                          </span>
-                        </div>
-
-                        <div className="border-t border-white/10 pt-3 flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setPaymentSheetCardId(card.id)}
-                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border border-white/20 text-muted-foreground hover:bg-white/10 transition-colors"
-                          >
-                            <History className="w-3 h-3" /> History
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </SwipeableListItem>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Add New Button */}
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveCard()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Archive "{cardPendingArchive?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>Archived items will no longer appear in active lists.</AlertDialogDescription>
+            <AlertDialogDescription>Archived cards will not be shown in active totals.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={cancelArchiveCard}>Cancel</AlertDialogCancel>
@@ -460,12 +194,54 @@ export function CreditCardsTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <button
-        onClick={handleAddCard}
-        className="w-full py-3 flex items-center justify-center gap-2 bg-primary/10 border border-primary/30 rounded-xl text-primary font-bold text-sm hover:bg-primary/20 transition-colors"
-      >
-        <Plus className="w-4 h-4" /> ADD NEW CARD
-      </button>
+      <Sheet open={Boolean(quickAddCardId)} onOpenChange={(open) => !open && closeQuickAdd()}>
+        <SheetContent side="bottom" className="bg-[#0d1117] border-t border-white/10 rounded-t-2xl p-0 flex flex-col" style={{ height: "42vh", maxHeight: "42vh" }}>
+          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/5">
+            <span className="text-sm font-bold uppercase tracking-wider text-foreground">Add Unbilled Expense</span>
+            <button onClick={closeQuickAdd} className="p-1.5 rounded-full bg-white/5 hover:bg-white/10">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Amount</label>
+              <input
+                type="number"
+                value={quickAddAmount}
+                onChange={(event) => setQuickAddAmount(event.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-foreground text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Note</label>
+              <textarea
+                value={quickAddNotes}
+                onChange={(event) => setQuickAddNotes(event.target.value)}
+                placeholder="Optional note"
+                rows={3}
+                className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-foreground text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 border-t border-white/10 p-4">
+            <button
+              type="button"
+              onClick={closeQuickAdd}
+              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmQuickAdd}
+              className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Save
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {paymentSheetCardId && (() => {
         const card = store.creditCards.find((c) => c.id === paymentSheetCardId);

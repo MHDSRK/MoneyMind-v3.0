@@ -6,6 +6,7 @@ import { AssetsTab } from "@/components/AssetsTab";
 import { LiabilitiesTab } from "@/components/LiabilitiesTab";
 import { CreditCardsTab } from "@/components/CreditCardsTab";
 import { LoansTab } from "@/components/LoansTab";
+import { EditPage } from "@/components/EditPage";
 import ArchivedTab from "@/components/ArchivedTab";
 import HistoryTab from "@/components/HistoryTab";
 import { CashFlowTab } from "@/components/CashFlowTab";
@@ -27,6 +28,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   "/loans": LoansTab,
   "/others": LiabilitiesTab,
   "/cashflow": CashFlowTab,
+  "/edit": EditPage,
   "/archived": ArchivedTab,
   "/history": HistoryTab,
 };
@@ -34,8 +36,9 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
 function App() {
   const [location, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = location.split("?")[0];
 
-  const CurrentTab = TAB_COMPONENTS[location];
+  const CurrentTab = TAB_COMPONENTS[pathname];
 
   return (
     <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col relative overflow-x-hidden selection:bg-primary/30">

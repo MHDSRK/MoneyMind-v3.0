@@ -8,6 +8,7 @@ import {
   getLiabilityGroupTotals,
   getCreditCardAvailableAmount,
 } from "@/lib/calculations";
+import { calculateCategoryBreakdown } from "@/lib/cashFlow";
 import {
   createTransaction as applyTransaction,
   updateTransaction,
@@ -1351,6 +1352,48 @@ describe("Financial Calculations", () => {
       expect(metrics.todayExpense).toBe(300);
       expect(metrics.monthlyIncome).toBe(1000);
       expect(metrics.monthlyExpense).toBe(300);
+    });
+
+    it("should exclude tracking-only transactions from category breakdown calculations", () => {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const transactions = [
+        {
+          id: "tx1",
+          date: todayStr,
+          ledger: "Salary",
+          amount: 1000,
+          type: "in",
+          category: "Salary",
+          notes: "",
+          tags: [],
+        },
+        {
+          id: "tx2",
+          date: todayStr,
+          ledger: "Lent",
+          amount: 200,
+          type: "out",
+          category: "Lent",
+          notes: "",
+          tags: [],
+        },
+        {
+          id: "tx3",
+          date: todayStr,
+          ledger: "Groceries",
+          amount: 300,
+          type: "out",
+          category: "Groceries",
+          notes: "",
+          tags: [],
+        },
+      ];
+
+      const breakdown = calculateCategoryBreakdown(transactions, todayStr, todayStr, "out");
+      expect(breakdown).toHaveLength(1);
+      expect(breakdown[0].category).toBe("Groceries");
+      expect(breakdown[0].amount).toBe(300);
     });
 
     it("should calculate today's income and expense", () => {
