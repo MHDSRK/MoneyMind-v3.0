@@ -122,6 +122,26 @@ export interface LendItem {
   updatedAt?: string;
 }
 
+export type HistoryEventType = "create" | "edit" | "archive" | "restore" | "delete";
+export type HistoryEventEntityType =
+  | "account"
+  | "credit-card"
+  | "loan"
+  | "liability"
+  | "transaction"
+  | "category"
+  | "lend";
+
+export interface HistoryEvent {
+  id: string;
+  type: HistoryEventType;
+  entityType: HistoryEventEntityType;
+  entityId: string;
+  entityName: string;
+  timestamp: string;
+  details?: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -139,6 +159,7 @@ export interface Store {
   liabilities: LiabilityItem[];
   lends: LendItem[];
   categories: Category[];
+  history: HistoryEvent[];
 }
 
 const INITIAL_DATA: Store = {
@@ -283,6 +304,7 @@ const INITIAL_DATA: Store = {
     { id: "medical", name: "Medical", type: "out" },
     { id: "others", name: "Others", type: "out" },
   ],
+  history: [],
 };
 
 const STORE_KEY = "moneymind-data";
@@ -322,6 +344,144 @@ function updateRecord<T extends { createdAt?: string; updatedAt?: string }>(
     createdAt: item.createdAt,
     updatedAt: createTimestamp(),
   };
+}
+
+type TrackableItem = { id: string; deleted?: boolean; archivedAt?: string; createdAt?: string; updatedAt?: string; isArchived?: boolean };
+
+function createHistoryEvent(event: Omit<HistoryEvent, "id" | "timestamp">): HistoryEvent {
+  return {
+    ...event,
+    id: crypto.randomUUID(),
+    timestamp: createTimestamp(),
+  };
+}
+
+function normalizeHistoryEvent(event: Partial<HistoryEvent>): HistoryEvent {
+  return {
+    id: event.id ?? crypto.randomUUID(),
+    type: event.type ?? "edit",
+    entityType: event.entityType ?? "transaction",
+    entityId: event.entityId ?? "",
+    entityName: event.entityName ?? "",
+    timestamp: event.timestamp ?? createTimestamp(),
+    details: event.details,
+  };
+}
+
+function getComparableItem(item: TrackableItem) {
+  const copy = { ...(item as Record<string, unknown>) };
+  delete copy.createdAt;
+  delete copy.updatedAt;
+  delete copy.archivedAt;
+  delete copy.isArchived;
+  delete copy.deleted;
+  return copy;
+}
+
+function isEditedItem(prevItem: TrackableItem, nextItem: TrackableItem) {
+  return JSON.stringify(getComparableItem(prevItem)) !== JSON.stringify(getComparableItem(nextItem));
+}
+
+function formatHistoryEntityName(item: Record<string, unknown>, entityType: HistoryEventEntityType) {
+  if (typeof item.name === "string" && item.name.trim()) return item.name;
+  if (entityType === "credit-card" && typeof item.provider === "string" && typeof item.name === "string") {
+    return item.name ? `${item.name}` : item.provider;
+  }
+  if (entityType === "transaction") {
+    const amount = typeof item.amount === "number" ? ` ${item.amount}` : "";
+    const label = typeof item.category === "string" && item.category ? item.category : typeof item.ledger === "string" && item.ledger ? item.ledger : "Transaction";
+    return `${label}${amount}`;
+  }
+  if (typeof item.account === "string" && item.account) return item.account;
+  return String(item.id ?? "Unknown");
+}
+
+function buildHistoryEvents(prev: Store, next: Store): HistoryEvent[] {
+  const events: HistoryEvent[] = [];
+
+  const diffEntities = <T extends TrackableItem>(
+    prevItems: T[],
+    nextItems: T[],
+    entityType: HistoryEventEntityType,
+    detailsResolver?: (item: T) => string
+  ) => {
+    const prevMap = new Map(prevItems.map((item) => [item.id, item]));
+
+    nextItems.forEach((nextItem) => {
+      const prevItem = prevMap.get(nextItem.id);
+      const entityName = formatHistoryEntityName(nextItem, entityType);
+      const details = detailsResolver?.(nextItem);
+
+      if (!prevItem) {
+        if (!nextItem.deleted) {
+          events.push(createHistoryEvent({
+            type: "create",
+            entityType,
+            entityId: nextItem.id,
+            entityName,
+            details,
+          }));
+        }
+        return;
+      }
+
+      if (!prevItem.deleted && nextItem.deleted) {
+        events.push(createHistoryEvent({
+          type: "delete",
+          entityType,
+          entityId: nextItem.id,
+          entityName,
+          details,
+        }));
+        return;
+      }
+
+      if (!prevItem.archivedAt && nextItem.archivedAt) {
+        events.push(createHistoryEvent({
+          type: "archive",
+          entityType,
+          entityId: nextItem.id,
+          entityName,
+          details,
+        }));
+        return;
+      }
+
+      if (prevItem.archivedAt && !nextItem.archivedAt) {
+        events.push(createHistoryEvent({
+          type: "restore",
+          entityType,
+          entityId: nextItem.id,
+          entityName,
+          details,
+        }));
+        return;
+      }
+
+      if (isEditedItem(prevItem, nextItem)) {
+        events.push(createHistoryEvent({
+          type: "edit",
+          entityType,
+          entityId: nextItem.id,
+          entityName,
+          details,
+        }));
+      }
+    });
+  };
+
+  diffEntities(prev.accounts, next.accounts, "account");
+  diffEntities(prev.creditCards, next.creditCards, "credit-card");
+  diffEntities(prev.loans, next.loans, "loan");
+  diffEntities(prev.liabilities, next.liabilities, "liability");
+  diffEntities(prev.transactions, next.transactions, "transaction", (item) => {
+    const amount = typeof item.amount === "number" ? `${item.amount}` : "";
+    return `${item.type} ${amount}`;
+  });
+  diffEntities(prev.categories, next.categories, "category");
+  diffEntities(prev.lends, next.lends, "lend");
+
+  return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
 export function updateAccount(store: Store, accountId: string, changes: Partial<Account>): Store {
@@ -619,6 +779,22 @@ export function restoreRecord<
   );
 }
 
+export function deleteRecord<
+  T extends { id: string; deleted?: boolean; updatedAt?: string }
+>(items: T[], id: string): T[] {
+  const updatedAt = new Date().toISOString();
+
+  return items.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          deleted: true,
+          updatedAt,
+        }
+      : item
+  );
+}
+
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 
 function normalizeAccountReference(value?: string) {
@@ -787,6 +963,7 @@ export function normalizeStore(parsed: Partial<Store>): Store {
     liabilities: (parsed.liabilities ?? INITIAL_DATA.liabilities).map(normalizeLiability),
     lends: (parsed.lends ?? []).map(normalizeLendItem),
     categories: (parsed.categories ?? INITIAL_DATA.categories).map(normalizeCategory),
+    history: (parsed.history ?? INITIAL_DATA.history).map(normalizeHistoryEvent),
   };
 }
 
@@ -832,7 +1009,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [store]);
 
   const updateStore = (updater: (prev: Store) => Store) => {
-    setStore((prev) => normalizeStore(updater(prev)));
+    setStore((prev) => {
+      const next = normalizeStore(updater(prev));
+      const events = buildHistoryEvents(prev, next);
+
+      if (events.length === 0) {
+        return next;
+      }
+
+      return {
+        ...next,
+        history: [...events, ...(next.history ?? [])].slice(0, 300),
+      };
+    });
   };
 
   return (

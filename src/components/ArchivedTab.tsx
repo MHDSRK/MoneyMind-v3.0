@@ -1,22 +1,28 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ArchiveRestore,
   BriefcaseBusiness,
   CreditCard,
   HandCoins,
   Landmark,
-  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  deleteRecord,
   restoreRecord,
-  updateAccount,
-  updateCreditCard,
-  updateLoan,
-  updateLiability,
   useStore,
 } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function sortByArchivedDate<T extends { archivedAt?: string }>(items: T[]) {
   return [...items].sort(
@@ -61,6 +67,7 @@ type ArchivedRowProps = {
   amount: number;
   archivedAt?: string;
   onRestore: () => void;
+  onDelete: () => void;
 };
 
 function ArchivedRow({
@@ -69,6 +76,7 @@ function ArchivedRow({
   amount,
   archivedAt,
   onRestore,
+  onDelete,
 }: ArchivedRowProps) {
   const archivedDate = archivedAt
     ? new Date(archivedAt).toLocaleDateString()
@@ -94,20 +102,35 @@ function ArchivedRow({
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={onRestore}
-        className="mt-3 inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
-      >
-        <ArchiveRestore className="h-3.5 w-3.5" />
-        Restore
-      </button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onRestore}
+          className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+        >
+          <ArchiveRestore className="h-3.5 w-3.5" />
+          Restore
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center gap-2 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/15"
+        >
+          Delete
+        </button>
+      </div>
     </div>
   );
 }
 
 export default function ArchivedTab() {
   const { store, updateStore } = useStore();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    type: "account" | "credit-card" | "loan" | "liability";
+    name: string;
+  } | null>(null);
 
   const archivedAccounts = useMemo(
     () =>
@@ -199,6 +222,51 @@ export default function ArchivedTab() {
     });
   };
 
+  const promptDeleteRecord = (id: string, type: "account" | "credit-card" | "loan" | "liability", name: string) => {
+    setDeleteTarget({ id, type, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteRecord = () => {
+    if (!deleteTarget) return;
+
+    updateStore((previous) => {
+      if (deleteTarget.type === "account") {
+        return {
+          ...previous,
+          accounts: deleteRecord(previous.accounts, deleteTarget.id),
+        };
+      }
+      if (deleteTarget.type === "credit-card") {
+        return {
+          ...previous,
+          creditCards: deleteRecord(previous.creditCards, deleteTarget.id),
+        };
+      }
+      if (deleteTarget.type === "loan") {
+        return {
+          ...previous,
+          loans: deleteRecord(previous.loans, deleteTarget.id),
+        };
+      }
+      return {
+        ...previous,
+        liabilities: deleteRecord(previous.liabilities, deleteTarget.id),
+      };
+    });
+
+    toast.success("Record deleted", {
+      description: `${deleteTarget.name} was permanently deleted.`,
+    });
+    setDeleteDialogOpen(false);
+    setDeleteTarget(null);
+  };
+
+  const cancelDeleteRecord = () => {
+    setDeleteDialogOpen(false);
+    setDeleteTarget(null);
+  };
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-24 pt-5">
       <div>
@@ -233,6 +301,7 @@ export default function ArchivedTab() {
                 amount={account.balance}
                 archivedAt={account.archivedAt}
                 onRestore={() => restoreAccount(account.id)}
+                onDelete={() => promptDeleteRecord(account.id, "account", account.name)}
               />
             ))}
           </ArchivedGroup>
@@ -250,6 +319,7 @@ export default function ArchivedTab() {
                 amount={card.outstanding}
                 archivedAt={card.archivedAt}
                 onRestore={() => restoreCard(card.id)}
+                onDelete={() => promptDeleteRecord(card.id, "credit-card", card.name)}
               />
             ))}
           </ArchivedGroup>
@@ -267,6 +337,7 @@ export default function ArchivedTab() {
                 amount={loan.outstanding}
                 archivedAt={loan.archivedAt}
                 onRestore={() => restoreLoan(loan.id)}
+                onDelete={() => promptDeleteRecord(loan.id, "loan", loan.name)}
               />
             ))}
           </ArchivedGroup>
@@ -284,11 +355,35 @@ export default function ArchivedTab() {
                 amount={liability.amount}
                 archivedAt={liability.archivedAt}
                 onRestore={() => restoreLiability(liability.id)}
+                onDelete={() => promptDeleteRecord(liability.id, "liability", liability.name)}
               />
             ))}
           </ArchivedGroup>
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !open && cancelDeleteRecord()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete "{deleteTarget?.name}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This record will be permanently deleted and cannot be restored.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteRecord}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={confirmDeleteRecord}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

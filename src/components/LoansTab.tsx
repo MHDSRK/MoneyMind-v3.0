@@ -1,5 +1,5 @@
 import { formatCurrency, cn } from "@/lib/utils";
-import { useStore, updateLoan, archiveRecord } from "@/hooks/useStore";
+import { useStore, type Loan, updateLoan, archiveRecord } from "@/hooks/useStore";
 import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -105,7 +105,7 @@ export function LoansTab() {
   };
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [loanPendingArchive, setLoanPendingArchive] = useState<ReturnType<typeof store.loans[number]> | null>(null);
+  const [loanPendingArchive, setLoanPendingArchive] = useState<Loan | null>(null);
 
   const handleArchiveLoan = (loanId: string) => {
     updateStore((prev) => ({
@@ -115,7 +115,7 @@ export function LoansTab() {
     toast({ title: "Loan archived", description: "The loan was archived and removed from active totals." });
   };
 
-  const promptArchiveLoan = (loan: ReturnType<typeof store.loans[number]>) => {
+  const promptArchiveLoan = (loan: Loan) => {
     setLoanPendingArchive(loan);
     setArchiveDialogOpen(true);
   };
@@ -346,6 +346,7 @@ export function LoansTab() {
                   </div>
                 )}
               </div>
+            </SwipeableListItem>
             );
           })}
         </div>

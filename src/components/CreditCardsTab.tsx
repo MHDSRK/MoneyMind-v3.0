@@ -437,7 +437,8 @@ export function CreditCardsTab() {
                       </>
                     )}
                   </div>
-              </div>
+                </div>
+              </SwipeableListItem>
             );
           })}
         </div>

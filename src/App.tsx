@@ -7,6 +7,7 @@ import { LiabilitiesTab } from "@/components/LiabilitiesTab";
 import { CreditCardsTab } from "@/components/CreditCardsTab";
 import { LoansTab } from "@/components/LoansTab";
 import ArchivedTab from "@/components/ArchivedTab";
+import HistoryTab from "@/components/HistoryTab";
 import { CashFlowTab } from "@/components/CashFlowTab";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import NotFound from "@/pages/not-found";
@@ -27,6 +28,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   "/others": LiabilitiesTab,
   "/cashflow": CashFlowTab,
   "/archived": ArchivedTab,
+  "/history": HistoryTab,
 };
 
 function App() {
