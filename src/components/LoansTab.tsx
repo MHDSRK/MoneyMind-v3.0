@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
+import { formatDisplayDate } from "@/utils/date";
 
 export function LoansTab() {
   const { store, updateStore } = useStore();
@@ -107,7 +108,7 @@ export function LoansTab() {
                 { label: "Lender", value: selectedLoan.lender || "Not set" },
                 { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount) },
                 { label: "Remaining", value: `${selectedLoan.emiCount - selectedLoan.paidCount} months` },
-                { label: "Next EMI", value: selectedLoan.nextEmiDate ? format(new Date(selectedLoan.nextEmiDate), "d MMM yyyy") : "Not set" },
+                { label: "Next EMI", value: formatDisplayDate(selectedLoan.nextEmiDate, "Not set") },
               ]
             : []
         }

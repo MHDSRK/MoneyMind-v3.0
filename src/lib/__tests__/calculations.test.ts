@@ -69,6 +69,21 @@ describe("Financial Calculations", () => {
       expect(metrics.netWorth).toBe(1000);
     });
 
+    it("should ignore Lent accounts even when the account name includes a lender reference", () => {
+      const store = createStore({
+        accounts: [
+          { id: "1", name: "Bank", type: "bank", balance: 2000, deleted: false },
+          { id: "2", name: "Lent to Ravi", type: "other", balance: 500, deleted: false },
+          { id: "3", name: "Petty Cash", type: "other", balance: 300, deleted: false },
+        ],
+      });
+
+      const metrics = calculateMetrics(store);
+      expect(metrics.otherAssetsBalance).toBe(300);
+      expect(metrics.totalAssets).toBe(2300);
+      expect(metrics.netWorth).toBe(2300);
+    });
+
     it("should ignore Lent accounts while including other non-tracking other assets", () => {
       const store = createStore({
         accounts: [

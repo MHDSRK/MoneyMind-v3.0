@@ -16,7 +16,7 @@ export function MasterListSection({ label, total, children, onAddNew }: MasterLi
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
         </div>
-        <div className="text-sm font-bold text-foreground">{formatCurrency(total)}</div>
+        <div className="ml-auto text-right text-sm font-bold text-foreground">{formatCurrency(total)}</div>
       </div>
       <div className="divide-y divide-white/10 overflow-hidden rounded-none bg-transparent">
         {children}

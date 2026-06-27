@@ -32,9 +32,9 @@ export function RecordDetailsDialog({ open, title, description, details, actions
           ))}
         </div>
 
-        <DialogFooter className="mt-4 gap-2">
-          <div className="flex-1">{actions}</div>
-          <Button variant="secondary" onClick={onClose}>
+        <DialogFooter className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-start">{actions}</div>
+          <Button variant="secondary" className="w-full sm:w-auto" onClick={onClose}>
             Close
           </Button>
         </DialogFooter>

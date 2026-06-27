@@ -7,6 +7,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { isTrackingAccount } from "@/lib/calculations";
+import { formatDisplayDate } from "@/utils/date";
 
 export function AssetsTab() {
   const { store, updateStore } = useStore();
@@ -23,18 +25,15 @@ export function AssetsTab() {
   const investmentAccounts = visibleAccounts.filter((a) => a.type === "investments");
   const insuranceAccounts = visibleAccounts.filter((a) => a.type === "insurance");
   const otherAccounts = visibleAccounts.filter((a) => a.type === "other");
+  const lentAccounts = otherAccounts.filter((account) => isTrackingAccount(account));
+  const nonTrackingOtherAccounts = otherAccounts.filter((account) => !isTrackingAccount(account));
 
   const bankTotal = bankAccounts.reduce((sum, account) => sum + account.balance, 0);
   const businessTotal = businessAccounts.reduce((sum, account) => sum + account.balance, 0);
   const investmentTotal = investmentAccounts.reduce((sum, account) => sum + account.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, account) => sum + account.balance, 0);
-  const otherTotal = otherAccounts.reduce((sum, account) => sum + account.balance, 0);
-  const nonTrackingOtherTotal = otherAccounts
-    .filter((account) => {
-      const normalizedName = account.name.trim().toLowerCase();
-      return normalizedName !== "lent" && normalizedName !== "tracking" && normalizedName !== "tracking-only";
-    })
-    .reduce((sum, account) => sum + account.balance, 0);
+  const lentTotal = lentAccounts.reduce((sum, account) => sum + account.balance, 0);
+  const nonTrackingOtherTotal = nonTrackingOtherAccounts.reduce((sum, account) => sum + account.balance, 0);
   const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal + nonTrackingOtherTotal;
   const [expandedSection, setExpandedSection] = useState<string | undefined>("bank");
 
@@ -215,13 +214,13 @@ export function AssetsTab() {
         <AccordionItem value="lent">
           <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
             <span>Lent</span>
-            <span className="text-sm font-bold">{formatCurrency(otherTotal)}</span>
+            <span className="text-sm font-bold">{formatCurrency(lentTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
-            {otherAccounts.length === 0 ? (
+            {lentAccounts.length === 0 ? (
               <div className="px-4 py-4 text-sm text-muted-foreground">No lent accounts yet.</div>
             ) : (
-              otherAccounts.map((account) => (
+              lentAccounts.map((account) => (
                 <div
                   key={account.id}
                   ref={(element) => { accountRefs.current[account.id] = element; }}
@@ -250,8 +249,8 @@ export function AssetsTab() {
             ? [
                 { label: "Balance", value: formatCurrency(selectedAccount.balance) },
                 { label: "Type", value: selectedAccount.type ?? "Not set" },
-                { label: "Created", value: selectedAccount.createdAt ? new Date(selectedAccount.createdAt).toLocaleDateString() : "Unknown" },
-                { label: "Updated", value: selectedAccount.updatedAt ? new Date(selectedAccount.updatedAt).toLocaleDateString() : "Unknown" },
+                { label: "Created", value: formatDisplayDate(selectedAccount.createdAt, "Unknown") },
+                { label: "Updated", value: formatDisplayDate(selectedAccount.updatedAt, "Unknown") },
               ]
             : []
         }

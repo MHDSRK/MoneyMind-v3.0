@@ -79,6 +79,7 @@ export interface Loan {
   id: string;
   name: string;
   lender: string;
+  tag?: string;
   principal: number;
   interestRate: number;
   emi?: number;

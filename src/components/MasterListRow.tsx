@@ -21,7 +21,7 @@ export function MasterListRow({ name, amount, subtitle, onClick, onArchive }: Ma
           <p className="text-sm font-medium text-foreground truncate">{name}</p>
           {subtitle ? <p className="text-xs text-muted-foreground mt-1 truncate">{subtitle}</p> : null}
         </div>
-        <div className="text-sm font-semibold text-foreground">
+        <div className="text-right text-sm font-semibold text-foreground">
           {typeof amount === "number" ? formatCurrency(amount) : amount}
         </div>
       </button>

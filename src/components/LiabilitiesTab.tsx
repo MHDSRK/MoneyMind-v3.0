@@ -10,6 +10,7 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
+import { formatDisplayDate } from "@/utils/date";
 
 const GROUPS = ["Regular Expenses", "Chitty", "Borrow", "More Liabilities"];
 
@@ -157,7 +158,7 @@ export function LiabilitiesTab() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-white">{item.name}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Archived {item.archivedAt ? new Date(item.archivedAt).toLocaleDateString() : "unknown"}
+                      Archived {formatDisplayDate(item.archivedAt, "unknown")}
                     </p>
                   </div>
                   <button
@@ -184,7 +185,7 @@ export function LiabilitiesTab() {
                 { label: "Amount", value: formatCurrency(selectedLiability.amount) },
                 { label: "Group", value: selectedLiability.group },
                 { label: "Due Date", value: selectedLiability.dueDate || "Not set" },
-                { label: "Created", value: selectedLiability.createdAt ? new Date(selectedLiability.createdAt).toLocaleDateString() : "Unknown" },
+                { label: "Created", value: formatDisplayDate(selectedLiability.createdAt, "Unknown") },
               ]
             : []
         }

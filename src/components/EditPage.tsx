@@ -5,6 +5,7 @@ import { EditableField } from "@/components/EditableField";
 import { EditDialog } from "@/components/EditDialog";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { formatDisplayDate } from "@/utils/date";
 
 type EditableEntity =
   | { type: "account"; item: Account }
@@ -201,6 +202,9 @@ export function EditPage() {
           case 'Loan Name':
             change.name = value;
             break;
+          case 'Tag':
+            change.tag = value;
+            break;
           case 'Total Loan':
             change.principal = Number.isFinite(parsedNumber) ? parsedNumber : entity.item.principal;
             break;
@@ -275,7 +279,7 @@ export function EditPage() {
           <EditableField label="Outstanding" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding', entity.item.outstanding.toString(), 'Edit outstanding amount')} />
           <EditableField label="Unbilled" value={formatCurrency(entity.item.unbilled ?? 0)} onEdit={() => openEditDialog(entity, 'Unbilled', String(entity.item.unbilled ?? 0), 'Edit unbilled amount')} />
           <EditableField label="Due Date" value={String(entity.item.dueDate)} onEdit={() => openEditDialog(entity, 'Due Date', String(entity.item.dueDate), 'Edit due date')} />
-          <EditableField label="Next Bill Date" value={entity.item.nextDueDate ? entity.item.nextDueDate.split('T')[0] : 'Not set'} onEdit={() => openEditDialog(entity, 'Next Bill Date', entity.item.nextDueDate ? entity.item.nextDueDate.split('T')[0] : '', 'Edit next bill date')} />
+          <EditableField label="Next Bill Date" value={formatDisplayDate(entity.item.nextDueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Next Bill Date', entity.item.nextDueDate ? entity.item.nextDueDate.split('T')[0] : '', 'Edit next bill date')} />
         </EditAccordion>
       );
     }
@@ -284,10 +288,11 @@ export function EditPage() {
       return (
         <EditAccordion key={id} label={entity.item.name} isOpen={isOpen} onToggle={toggle}>
           <EditableField label="Loan Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Loan Name', entity.item.name, 'Edit loan name')} />
+          <EditableField label="Tag" value={entity.item.tag || 'Not set'} onEdit={() => openEditDialog(entity, 'Tag', entity.item.tag || '', 'Edit loan tag')} />
           <EditableField label="Total Loan" value={formatCurrency(entity.item.principal)} onEdit={() => openEditDialog(entity, 'Total Loan', entity.item.principal.toString(), 'Edit total loan amount')} />
           <EditableField label="Outstanding Balance" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding Balance', entity.item.outstanding.toString(), 'Edit outstanding balance')} />
           <EditableField label="EMI / Month" value={formatCurrency(entity.item.emiAmount)} onEdit={() => openEditDialog(entity, 'EMI / Month', entity.item.emiAmount.toString(), 'Edit EMI amount')} />
-          <EditableField label="Next EMI" value={entity.item.nextEmiDate || 'Not set'} onEdit={() => openEditDialog(entity, 'Next EMI', entity.item.nextEmiDate || '', 'Edit next EMI date')} />
+          <EditableField label="Next EMI" value={formatDisplayDate(entity.item.nextEmiDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Next EMI', entity.item.nextEmiDate || '', 'Edit next EMI date')} />
           <EditableField label="Remaining Months" value={String((entity.item.emiCount ?? 0) - (entity.item.paidCount ?? 0))} onEdit={() => openEditDialog(entity, 'Remaining Months', String((entity.item.emiCount ?? 0) - (entity.item.paidCount ?? 0)), 'Edit remaining months')} />
         </EditAccordion>
       );

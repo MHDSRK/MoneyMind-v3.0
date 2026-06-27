@@ -41,13 +41,22 @@ function normalizeAccountReference(value?: string) {
   return value?.replace(/^account:/, "").replace(/^card:/, "");
 }
 
-function isTrackingAccount(account: { name?: string }): boolean {
-  const normalizedName = account.name?.trim().toLowerCase();
-  return normalizedName === "lent" || normalizedName === "tracking" || normalizedName === "tracking-only";
+function normalizeTrackingValue(value?: string): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function isTrackingLabel(value?: string): boolean {
+  const normalizedValue = normalizeTrackingValue(value);
+  if (!normalizedValue) return false;
+
+  return /\blent\b/.test(normalizedValue) || normalizedValue === "tracking" || normalizedValue === "tracking-only";
+}
+
+export function isTrackingAccount(account: { name?: string }): boolean {
+  return isTrackingLabel(account.name);
 }
 
 export function isTrackingTransaction(transaction: Transaction): boolean {
-  const trackingTerms = ["lent", "tracking", "tracking-only"];
   const candidates = [
     transaction.category,
     transaction.ledger,
@@ -57,11 +66,7 @@ export function isTrackingTransaction(transaction: Transaction): boolean {
     transaction.notes,
   ];
 
-  return candidates.some((value) => {
-    if (!value) return false;
-    const normalized = value.trim().toLowerCase();
-    return trackingTerms.some((term) => normalized === term || normalized.includes(term));
-  });
+  return candidates.some((value) => isTrackingLabel(value));
 }
 
 export interface UpcomingCreditCardDue {

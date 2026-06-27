@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
+import { formatDisplayDate } from "@/utils/date";
 
 export function CreditCardsTab() {
   const { store, updateStore } = useStore();
@@ -144,7 +145,7 @@ export function CreditCardsTab() {
                 { label: "Outstanding", value: formatCurrency(selectedCard.outstanding) },
                 { label: "Unbilled", value: formatCurrency(selectedCard.unbilled ?? 0) },
                 { label: "Due Day", value: String(selectedCard.dueDate) },
-                { label: "Next Bill", value: selectedCard.nextDueDate ? format(new Date(selectedCard.nextDueDate), "d MMM yyyy") : "Not set" },
+                { label: "Next Bill", value: formatDisplayDate(selectedCard.nextDueDate, "Not set") },
               ]
             : []
         }
