@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useStore } from "@/hooks/useStore";
 import { Cloud, ChevronDown, ChevronRight } from "lucide-react";
 import * as googleDriveService from "@/lib/googleDriveService";
-import { format, parseISO } from "date-fns";
+import { formatAppDate } from "@/utils/date";
 
 export function GoogleDriveSection() {
   const { store, updateStore } = useStore();
@@ -53,7 +53,7 @@ export function GoogleDriveSection() {
     }
     try {
       setLoading(true);
-      const timestamp = format(new Date(), "yyyy-MM-dd_HH-mm-ss");
+      const timestamp = new Date().toISOString().slice(0, 19).replace("T", "_").replace(/:/g, "-");
       const fileName = `MoneyMind_Backup_${timestamp}.json`;
       const backup = await googleDriveService.uploadBackupToGoogleDrive(store, fileName);
       alert(`✓ Backup uploaded to Google Drive!\n${backup.name}\n${backup.size} bytes`);
@@ -192,7 +192,7 @@ export function GoogleDriveSection() {
                         {backup.name}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        {format(parseISO(backup.modifiedTime), "MMM d, yyyy HH:mm")}
+                        {formatAppDate(backup.modifiedTime)}
                       </p>
                       <div className="flex gap-2 mt-2">
                         <button

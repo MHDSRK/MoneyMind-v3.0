@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import { Search, X } from "lucide-react";
-import { format, parseISO } from "date-fns";
 import { useLocation } from "wouter";
 import { searchStore, SearchResult, SearchResultType } from "@/lib/search";
+import { formatAppDate } from "@/utils/date";
 
 const FILTERS: Array<{ label: string; value: SearchResultType }> = [
   { label: "Assets", value: "account" },
@@ -54,12 +54,7 @@ function getAmountClass(result: SearchResult) {
 
 function formatResultDate(date?: string) {
   if (!date) return null;
-
-  try {
-    return format(parseISO(date), "d MMM");
-  } catch {
-    return date;
-  }
+  return formatAppDate(date);
 }
 
 export function SearchPanel({ open, onClose }: { open: boolean; onClose: () => void }) {

@@ -4,6 +4,7 @@ import { formatDistanceToNowStrict, parseISO } from "date-fns";
 import { Activity, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { formatAppDate } from "@/utils/date";
 
 const EVENT_LABELS: Record<string, { label: string; accent: string }> = {
   create: { label: "Created", accent: "text-emerald-400" },
@@ -81,6 +82,9 @@ export default function HistoryTab() {
                     <p className="text-sm font-semibold text-white">
                       {label.label} {event.entityType.replace("credit-card", "credit card")}
                       <span className="text-muted-foreground"> — {event.entityName}</span>
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                      {formatAppDate(event.timestamp)}
                     </p>
                     {event.details && (
                       <p className="mt-1 text-xs text-muted-foreground">{event.details}</p>

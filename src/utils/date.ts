@@ -1,10 +1,7 @@
-import { format } from "date-fns";
+import { formatAppDate as formatAppDateImpl } from "./dateFormatter";
 
 export function formatDisplayDate(value?: string | Date | null, fallback = "Not set") {
-  if (!value) return fallback;
-
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return fallback;
-
-  return format(date, "dd/LLL/yyyy");
+  return formatAppDateImpl(value ?? undefined, fallback);
 }
+
+export { formatAppDateImpl as formatAppDate };

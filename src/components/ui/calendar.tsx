@@ -9,6 +9,7 @@ import {
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
+import { formatAppDate } from "@/utils/date"
 import { Button, buttonVariants } from "@/components/ui/button"
 
 function Calendar({
@@ -190,7 +191,7 @@ function CalendarDayButton({
       ref={ref}
       variant="ghost"
       size="icon"
-      data-day={day.date.toLocaleDateString()}
+      data-day={formatAppDate(day.date)}
       data-selected-single={
         modifiers.selected &&
         !modifiers.range_start &&

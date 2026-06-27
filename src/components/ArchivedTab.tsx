@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { formatAppDate } from "@/utils/date";
 
 function sortByArchivedDate<T extends { archivedAt?: string }>(items: T[]) {
   return [...items].sort(
@@ -78,9 +79,7 @@ function ArchivedRow({
   onRestore,
   onDelete,
 }: ArchivedRowProps) {
-  const archivedDate = archivedAt
-    ? new Date(archivedAt).toLocaleDateString()
-    : "Unknown date";
+  const archivedDate = archivedAt ? formatAppDate(archivedAt) : "Unknown date";
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">

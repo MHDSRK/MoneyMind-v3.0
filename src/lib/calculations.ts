@@ -131,6 +131,10 @@ export function getCreditCardAvailableAmount(card: { creditLimit: number; outsta
   return card.creditLimit - card.outstanding - (card.unbilled ?? 0);
 }
 
+export function getCreditCardDueAmount(card: { outstanding: number; unbilled?: number }): number {
+  return card.outstanding + (card.unbilled ?? 0);
+}
+
 export function getLiabilityScopeSummary(
   store: Store,
   selectedLiabilityId: string | null,

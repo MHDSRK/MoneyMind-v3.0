@@ -54,6 +54,7 @@ export interface Account {
   isArchived?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  notes?: string;
 }
 
 export interface CreditCard {
@@ -892,6 +893,7 @@ function normalizeLoan(loan: Partial<Loan>): Loan {
     id: loan.id ?? crypto.randomUUID(),
     name: loan.name ?? "",
     lender: loan.lender ?? "",
+    tag: loan.tag ?? "",
     principal: loan.principal ?? 0,
     interestRate: loan.interestRate ?? 0,
     emi: loan.emi,

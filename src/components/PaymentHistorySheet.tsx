@@ -4,9 +4,9 @@ import { createTransaction } from "@/lib/transactionEffects";
 import { getPaymentHistory, getTotalPaid } from "@/lib/paymentHistory";
 import { formatCurrency } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { format } from "date-fns";
 import { X, History, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { formatAppDate } from "@/utils/date";
 
 interface PaymentHistorySheetProps {
   open: boolean;
@@ -34,7 +34,7 @@ export function PaymentHistorySheet({
   const [amount, setAmount] = useState(defaultAmount?.toString() ?? "");
   const [fromAccountId, setFromAccountId] = useState("");
   const [notes, setNotes] = useState("");
-  const [payDate, setPayDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
 
   const history = getPaymentHistory(store, entityType, entityId);
   const totalPaid = getTotalPaid(store, entityType, entityId);
@@ -84,7 +84,7 @@ export function PaymentHistorySheet({
     setAmount(defaultAmount?.toString() ?? "");
     setFromAccountId("");
     setNotes("");
-    setPayDate(format(new Date(), "yyyy-MM-dd"));
+    setPayDate(new Date().toISOString().slice(0, 10));
   };
 
   return (
@@ -210,7 +210,7 @@ export function PaymentHistorySheet({
                       {tx.notes || tx.ledger || "Payment"}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {format(new Date(tx.date), "d MMM yyyy")}
+                      {formatAppDate(tx.date)}
                       {tx.fromAccount && ` · ${tx.fromAccount}`}
                     </p>
                   </div>

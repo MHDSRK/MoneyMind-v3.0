@@ -5,9 +5,9 @@ import { calculateMetrics, getUpcomingCreditCardDues } from "@/lib/calculations"
 import { createTransaction } from "@/lib/transactionEffects";
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { formatAppDate } from "@/utils/date";
 
 type TransactionMode = "in" | "out" | "self";
 
@@ -29,7 +29,7 @@ export function HomeTab() {
   // Calculate all financial metrics, excluding tracking-only items.
   const financialMetrics = calculateMetrics(store);
 
-  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const todayStr = new Date().toISOString().slice(0, 10);
   const todayNet = financialMetrics.todayIncome - financialMetrics.todayExpense;
 
   const upcomingDues = getUpcomingCreditCardDues(store);
@@ -240,7 +240,7 @@ export function HomeTab() {
                       ? "Tomorrow"
                       : `In ${cc.daysLeft} days`}
                     {" · "}
-                    {format(new Date(cc.nextDueDate), "d MMM")}
+                    {formatAppDate(cc.nextDueDate)}
                   </p>
                 </div>
                 <span

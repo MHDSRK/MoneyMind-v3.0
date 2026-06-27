@@ -3,8 +3,8 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { useStore, Transaction, deleteTransactionFromStore, restoreTransactionFromStore, updateTransactionInStore } from "@/hooks/useStore";
 import { createTransaction } from "@/lib/transactionEffects";
 import { isTrackingTransaction } from "@/lib/calculations";
-import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { formatAppDate } from "@/utils/date";
 import { ToastAction } from "@/components/ui/toast";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
@@ -35,7 +35,7 @@ export function TodayTab() {
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
 
-  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const todayStr = new Date().toISOString().slice(0, 10);
   const todaysTx = store.transactions.filter(
     (t) => !t.deleted && !t.archivedAt && t.date.startsWith(todayStr) && !isTrackingTransaction(t)
   );
@@ -197,7 +197,7 @@ export function TodayTab() {
     <div className="pb-32 px-4 pt-24 space-y-6">
       <div className="flex flex-col">
         <h2 className="text-2xl font-bold text-foreground">Today's Cash Flow</h2>
-        <span className="text-primary neon-text text-sm">{format(new Date(), "EEEE, MMMM d, yyyy")}</span>
+        <span className="text-primary neon-text text-sm">{formatAppDate(new Date())}</span>
       </div>
 
       <div className="glass-card overflow-hidden">

@@ -7,6 +7,7 @@ import {
   getLiabilityScopeSummary,
   getLiabilityGroupTotals,
   getCreditCardAvailableAmount,
+  getCreditCardDueAmount,
 } from "@/lib/calculations";
 import { calculateCategoryBreakdown } from "@/lib/cashFlow";
 import {
@@ -213,6 +214,11 @@ describe("Financial Calculations", () => {
       // Available = Total Limit - Outstanding - Unbilled
       expect(metrics.creditCardUnbilled).toBe(2000);
       expect(metrics.creditCardAvailableLimit).toBe(5000);
+    });
+
+    it("should compute the due amount from outstanding and unbilled balances", () => {
+      expect(getCreditCardDueAmount({ outstanding: 1200, unbilled: 300 })).toBe(1500);
+      expect(getCreditCardDueAmount({ outstanding: 500 })).toBe(500);
     });
 
     it("should sum all credit card outstanding amounts", () => {

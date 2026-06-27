@@ -2,14 +2,13 @@
 import { useStore, CreditCard, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import { createUnbilledTransaction } from "@/lib/transactionEffects";
-import { getCreditCardAvailableAmount } from "@/lib/calculations";
+import { getCreditCardAvailableAmount, getCreditCardDueAmount } from "@/lib/calculations";
 import { MasterListSection } from "@/components/MasterListSection";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { X } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
@@ -29,6 +28,7 @@ export function CreditCardsTab() {
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const visibleCards = store.creditCards.filter((card) => !card.deleted && !card.archivedAt);
+  const totalDue = visibleCards.reduce((sum, card) => sum + getCreditCardDueAmount(card), 0);
   const totalLimit = visibleCards.reduce((sum, card) => sum + card.creditLimit, 0);
   const totalOutstanding = visibleCards.reduce((sum, card) => sum + card.outstanding, 0);
   const totalUnbilled = visibleCards.reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
@@ -97,20 +97,20 @@ export function CreditCardsTab() {
   };
 
   const cardAvailable = (card: CreditCard) => Math.max(0, getCreditCardAvailableAmount(card));
+  const cardDueAmount = (card: CreditCard) => getCreditCardDueAmount(card);
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Credit Cards</h2>
-          <p className="text-sm text-muted-foreground">Tap a card to view details, swipe left to archive.</p>
         </div>
-        <div className={totalAvailable < 0 ? "text-destructive text-2xl font-bold" : "text-primary neon-text text-2xl font-bold"}>
-          {formatCurrency(totalAvailable)}
+        <div className="text-2xl font-bold text-destructive">
+          {formatCurrency(totalDue)}
         </div>
       </div>
 
-      <MasterListSection label="Credit Cards" total={totalAvailable}>
+      <MasterListSection label="Credit Cards" total={totalDue}>
         {visibleCards.length === 0 ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">No active credit cards yet. Add one to begin.</div>
         ) : (
@@ -123,9 +123,12 @@ export function CreditCardsTab() {
               <MasterListRow
                 name={card.name}
                 subtitle={card.provider || card.cardType || "Credit card"}
-                amount={cardAvailable(card)}
+                amount={cardDueAmount(card)}
                 onClick={() => setSelectedCard(card)}
                 onArchive={() => promptArchiveCard(card)}
+                amountClassName="text-destructive"
+                secondaryText={`Due • ${formatDisplayDate(card.nextDueDate, "Not set")}`}
+                secondaryTextClassName="text-muted-foreground"
               />
             </div>
           ))
@@ -135,58 +138,50 @@ export function CreditCardsTab() {
       <RecordDetailsDialog
         open={Boolean(selectedCard)}
         title={selectedCard?.name ?? "Card details"}
-        description="Review credit card values and open payment history."
-        details={
+        description={selectedCard ? `Due Date • ${formatDisplayDate(selectedCard.nextDueDate, "Not set")}` : ""}
+        details={[]}
+        hideDetailsList
+        footerActions={
           selectedCard
             ? [
-                { label: "Provider", value: selectedCard.provider || "Not set" },
-                { label: "Card Type", value: selectedCard.cardType || "Not set" },
-                { label: "Credit Limit", value: formatCurrency(selectedCard.creditLimit) },
-                { label: "Outstanding", value: formatCurrency(selectedCard.outstanding) },
-                { label: "Unbilled", value: formatCurrency(selectedCard.unbilled ?? 0) },
-                { label: "Due Day", value: String(selectedCard.dueDate) },
-                { label: "Next Bill", value: formatDisplayDate(selectedCard.nextDueDate, "Not set") },
+                {
+                  key: "add-unbilled",
+                  label: "Add Unbilled",
+                  variant: "secondary",
+                  onClick: () => openQuickAdd(selectedCard.id),
+                },
+                {
+                  key: "history",
+                  label: "History",
+                  variant: "secondary",
+                  onClick: () => setPaymentSheetCardId(selectedCard.id),
+                },
+                {
+                  key: "archive",
+                  label: "Archive",
+                  variant: "warning",
+                  onClick: () => promptArchiveCard(selectedCard),
+                },
+                {
+                  key: "close",
+                  label: "Close",
+                  variant: "primary",
+                  onClick: () => setSelectedCard(null),
+                },
               ]
-            : []
-        }
-        actions={
-          selectedCard ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={() => openQuickAdd(selectedCard.id)}
-                className="rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary border border-primary/20 hover:bg-primary/20"
-              >
-                Add Unbilled
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentSheetCardId(selectedCard.id)}
-                className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-foreground border border-white/10 hover:bg-white/10"
-              >
-                History
-              </button>
-              <button
-                type="button"
-                onClick={() => promptArchiveCard(selectedCard)}
-                className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-white hover:bg-destructive/90"
-              >
-                Archive
-              </button>
-            </div>
-          ) : null
+            : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedCard(null) }]
         }
         onClose={() => setSelectedCard(null)}
       >
         {selectedCard ? (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Available</p>
-              <p className="mt-2 text-3xl font-semibold text-primary">{formatCurrency(cardAvailable(selectedCard))}</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-h-[92px] rounded-2xl bg-primary p-4 text-white">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-primary-foreground/80">Available</p>
+              <p className="mt-2 text-xl font-semibold">{formatCurrency(cardAvailable(selectedCard))}</p>
             </div>
-            <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive/80">Due Amount</p>
-              <p className="mt-1 text-2xl font-semibold text-destructive">{formatCurrency(selectedCard.outstanding + (selectedCard.unbilled ?? 0))}</p>
+            <div className="min-h-[92px] rounded-2xl bg-destructive p-4 text-white">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive-foreground/80">Due</p>
+              <p className="mt-2 text-xl font-semibold">{formatCurrency(cardDueAmount(selectedCard))}</p>
             </div>
           </div>
         ) : null}

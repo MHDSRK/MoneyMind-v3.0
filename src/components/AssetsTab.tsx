@@ -22,7 +22,7 @@ export function AssetsTab() {
   const visibleAccounts = store.accounts.filter((account) => !account.deleted && !account.archivedAt);
   const bankAccounts = visibleAccounts.filter((a) => a.type === "cash" || a.type === "bank");
   const businessAccounts = visibleAccounts.filter((a) => a.type === "business");
-  const investmentAccounts = visibleAccounts.filter((a) => a.type === "investments");
+  const investmentAccounts = visibleAccounts.filter((a) => a.type === "investments" || a.type === "investment");
   const insuranceAccounts = visibleAccounts.filter((a) => a.type === "insurance");
   const otherAccounts = visibleAccounts.filter((a) => a.type === "other");
   const lentAccounts = otherAccounts.filter((account) => isTrackingAccount(account));
@@ -89,6 +89,14 @@ export function AssetsTab() {
     setAccountPendingArchive(null);
   };
 
+  const openAccountDetails = (account: Account) => {
+    if (isTrackingAccount(account)) {
+      setSelectedAccount(account);
+    }
+  };
+
+  const isLentAccount = (account: Account) => isTrackingAccount(account);
+
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
       <div className="flex items-center justify-between mb-2">
@@ -100,9 +108,9 @@ export function AssetsTab() {
 
       <Accordion type="single" collapsible value={expandedSection} onValueChange={setExpandedSection} className="space-y-3">
         <AccordionItem value="bank">
-          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
-            <span>Bank & Cash</span>
-            <span className="text-sm font-bold">{formatCurrency(bankTotal)}</span>
+          <AccordionTrigger className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span className="min-w-0 flex-1 text-left">Bank & Cash</span>
+            <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(bankTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
             {bankAccounts.length === 0 ? (
@@ -118,8 +126,9 @@ export function AssetsTab() {
                     name={account.name}
                     subtitle={account.type === "cash" ? "Cash" : "Bank"}
                     amount={account.balance}
-                    onClick={() => setSelectedAccount(account)}
+                    onClick={() => openAccountDetails(account)}
                     onArchive={() => promptArchiveAccount(account)}
+                    interactive={false}
                   />
                 </div>
               ))
@@ -128,9 +137,9 @@ export function AssetsTab() {
         </AccordionItem>
 
         <AccordionItem value="business">
-          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
-            <span>Business</span>
-            <span className="text-sm font-bold">{formatCurrency(businessTotal)}</span>
+          <AccordionTrigger className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span className="min-w-0 flex-1 text-left">Business</span>
+            <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(businessTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
             {businessAccounts.length === 0 ? (
@@ -146,8 +155,9 @@ export function AssetsTab() {
                     name={account.name}
                     subtitle="Business"
                     amount={account.balance}
-                    onClick={() => setSelectedAccount(account)}
+                    onClick={() => openAccountDetails(account)}
                     onArchive={() => promptArchiveAccount(account)}
+                    interactive={false}
                   />
                 </div>
               ))
@@ -156,9 +166,9 @@ export function AssetsTab() {
         </AccordionItem>
 
         <AccordionItem value="investments">
-          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
-            <span>Investments</span>
-            <span className="text-sm font-bold">{formatCurrency(investmentTotal)}</span>
+          <AccordionTrigger className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span className="min-w-0 flex-1 text-left">Investments</span>
+            <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(investmentTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
             {investmentAccounts.length === 0 ? (
@@ -174,8 +184,9 @@ export function AssetsTab() {
                     name={account.name}
                     subtitle="Investments"
                     amount={account.balance}
-                    onClick={() => setSelectedAccount(account)}
+                    onClick={() => openAccountDetails(account)}
                     onArchive={() => promptArchiveAccount(account)}
+                    interactive={false}
                   />
                 </div>
               ))
@@ -184,9 +195,9 @@ export function AssetsTab() {
         </AccordionItem>
 
         <AccordionItem value="insurance">
-          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
-            <span>Insurance</span>
-            <span className="text-sm font-bold">{formatCurrency(insuranceTotal)}</span>
+          <AccordionTrigger className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span className="min-w-0 flex-1 text-left">Insurance</span>
+            <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(insuranceTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
             {insuranceAccounts.length === 0 ? (
@@ -202,8 +213,9 @@ export function AssetsTab() {
                     name={account.name}
                     subtitle="Insurance"
                     amount={account.balance}
-                    onClick={() => setSelectedAccount(account)}
+                    onClick={() => openAccountDetails(account)}
                     onArchive={() => promptArchiveAccount(account)}
+                    interactive={false}
                   />
                 </div>
               ))
@@ -212,9 +224,9 @@ export function AssetsTab() {
         </AccordionItem>
 
         <AccordionItem value="lent">
-          <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
-            <span>Lent</span>
-            <span className="text-sm font-bold">{formatCurrency(lentTotal)}</span>
+          <AccordionTrigger className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+            <span className="min-w-0 flex-1 text-left">Lent</span>
+            <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(lentTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
             {lentAccounts.length === 0 ? (
@@ -230,8 +242,9 @@ export function AssetsTab() {
                     name={account.name}
                     subtitle="Lent"
                     amount={account.balance}
-                    onClick={() => setSelectedAccount(account)}
+                    onClick={() => openAccountDetails(account)}
                     onArchive={() => promptArchiveAccount(account)}
+                    interactive={isLentAccount(account)}
                   />
                 </div>
               ))
@@ -241,32 +254,49 @@ export function AssetsTab() {
       </Accordion>
 
       <RecordDetailsDialog
-        open={Boolean(selectedAccount)}
+        open={Boolean(selectedAccount && isLentAccount(selectedAccount))}
         title={selectedAccount?.name ?? "Account details"}
-        description="Tap a row to view account details and archive from here."
+        description="Review lent account details and archive from here."
         details={
-          selectedAccount
+          selectedAccount && isLentAccount(selectedAccount)
             ? [
-                { label: "Balance", value: formatCurrency(selectedAccount.balance) },
-                { label: "Type", value: selectedAccount.type ?? "Not set" },
-                { label: "Created", value: formatDisplayDate(selectedAccount.createdAt, "Unknown") },
-                { label: "Updated", value: formatDisplayDate(selectedAccount.updatedAt, "Unknown") },
+                { label: "Name", value: selectedAccount.name },
+                { label: "Amount", value: formatCurrency(selectedAccount.balance) },
+                { label: "Last Updated", value: formatDisplayDate(selectedAccount.updatedAt, "Unknown") },
               ]
             : []
         }
-        actions={
-          selectedAccount ? (
-            <button
-              type="button"
-              onClick={() => selectedAccount && promptArchiveAccount(selectedAccount)}
-              className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-white hover:bg-destructive/90"
-            >
-              Archive
-            </button>
-          ) : null
+        footerActions={
+          selectedAccount
+            ? [
+                {
+                  key: "archive",
+                  label: "Archive",
+                  variant: "warning",
+                  onClick: () => promptArchiveAccount(selectedAccount),
+                },
+                {
+                  key: "close",
+                  label: "Close",
+                  variant: "primary",
+                  onClick: () => setSelectedAccount(null),
+                },
+              ]
+            : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedAccount(null) }]
         }
         onClose={() => setSelectedAccount(null)}
-      />
+      >
+        {selectedAccount && isLentAccount(selectedAccount) ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Notes</p>
+              <div className="min-h-[96px] whitespace-pre-wrap rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-foreground">
+                {selectedAccount.notes?.trim() ? selectedAccount.notes : "-"}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </RecordDetailsDialog>
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveAccount()}>
         <AlertDialogContent>

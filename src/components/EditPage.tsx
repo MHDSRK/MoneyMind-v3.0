@@ -161,7 +161,18 @@ export function EditPage() {
 
     updateStore((prev) => {
       if (entity.type === 'account') {
-        const change: Partial<Account> = field === 'Balance' ? { balance: Number.isFinite(parsedNumber) ? parsedNumber : entity.item.balance } : { name: value };
+        const change: Partial<Account> = {};
+        switch (field) {
+          case 'Account Name':
+            change.name = value;
+            break;
+          case 'Balance':
+            change.balance = Number.isFinite(parsedNumber) ? parsedNumber : entity.item.balance;
+            break;
+          case 'Notes':
+            change.notes = value;
+            break;
+        }
         return updateAccount(prev, entity.item.id, change);
       }
 
@@ -246,8 +257,24 @@ export function EditPage() {
     });
   };
 
+  const getDialogInputType = (entity?: EditableEntity, field?: string) => {
+    if (field === 'Next Bill Date' || field === 'Next EMI') return 'date';
+    if (field === 'Due Date' && entity?.type === 'liability') return 'date';
+    if (field === 'Due Date' && entity?.type === 'credit-card') return 'number';
+    if (field === 'Credit Limit' || field === 'Outstanding' || field === 'Unbilled' || field === 'Balance' || field === 'Total Loan' || field === 'Outstanding Balance' || field === 'EMI / Month' || field === 'Amount' || field === 'Remaining Months') return 'number';
+    return 'text';
+  };
+
+  const normalizeDialogValue = (entity: EditableEntity | undefined, field: string | undefined, currentValue: string) => {
+    if (!entity || !field) return currentValue;
+    if ((field === 'Next Bill Date' || field === 'Next EMI' || (field === 'Due Date' && entity.type === 'liability')) && currentValue) {
+      return currentValue.split('T')[0];
+    }
+    return currentValue;
+  };
+
   const openEditDialog = (entity: EditableEntity, field: string, currentValue: string, title: string, description?: string) => {
-    setDialog({ open: true, entity, field, value: currentValue, title, description });
+    setDialog({ open: true, entity, field, value: normalizeDialogValue(entity, field, currentValue), title, description });
   };
 
   const handleDialogSave = (newValue: string) => {
@@ -264,7 +291,8 @@ export function EditPage() {
       return (
         <EditAccordion key={id} label={entity.item.name} isOpen={isOpen} onToggle={toggle}>
           <EditableField label="Account Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Account Name', entity.item.name, 'Edit account name')} />
-          <EditableField label="Balance" value={formatCurrency(entity.item.balance)} onEdit={() => openEditDialog(entity, 'Balance', entity.item.balance.toString(), 'Edit account balance')} />
+          <EditableField label="Opening Balance" value={formatCurrency(entity.item.balance)} onEdit={() => openEditDialog(entity, 'Balance', entity.item.balance.toString(), 'Edit account balance')} />
+          <EditableField label="Notes" value={entity.item.notes || 'Not set'} onEdit={() => openEditDialog(entity, 'Notes', entity.item.notes || '', 'Edit account notes')} />
         </EditAccordion>
       );
     }
@@ -273,8 +301,6 @@ export function EditPage() {
       return (
         <EditAccordion key={id} label={entity.item.name} isOpen={isOpen} onToggle={toggle}>
           <EditableField label="Card Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Card Name', entity.item.name, 'Edit card name')} />
-          <EditableField label="Provider" value={entity.item.provider || 'Not set'} onEdit={() => openEditDialog(entity, 'Provider', entity.item.provider || '', 'Edit provider')} />
-          <EditableField label="Card Type" value={entity.item.cardType || 'Not set'} onEdit={() => openEditDialog(entity, 'Card Type', entity.item.cardType || '', 'Edit card type')} />
           <EditableField label="Credit Limit" value={formatCurrency(entity.item.creditLimit)} onEdit={() => openEditDialog(entity, 'Credit Limit', entity.item.creditLimit.toString(), 'Edit credit limit')} />
           <EditableField label="Outstanding" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding', entity.item.outstanding.toString(), 'Edit outstanding amount')} />
           <EditableField label="Unbilled" value={formatCurrency(entity.item.unbilled ?? 0)} onEdit={() => openEditDialog(entity, 'Unbilled', String(entity.item.unbilled ?? 0), 'Edit unbilled amount')} />
@@ -289,8 +315,8 @@ export function EditPage() {
         <EditAccordion key={id} label={entity.item.name} isOpen={isOpen} onToggle={toggle}>
           <EditableField label="Loan Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Loan Name', entity.item.name, 'Edit loan name')} />
           <EditableField label="Tag" value={entity.item.tag || 'Not set'} onEdit={() => openEditDialog(entity, 'Tag', entity.item.tag || '', 'Edit loan tag')} />
-          <EditableField label="Total Loan" value={formatCurrency(entity.item.principal)} onEdit={() => openEditDialog(entity, 'Total Loan', entity.item.principal.toString(), 'Edit total loan amount')} />
-          <EditableField label="Outstanding Balance" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding Balance', entity.item.outstanding.toString(), 'Edit outstanding balance')} />
+          <EditableField label="Loan Amount" value={formatCurrency(entity.item.principal)} onEdit={() => openEditDialog(entity, 'Total Loan', entity.item.principal.toString(), 'Edit total loan amount')} />
+          <EditableField label="Outstanding" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding Balance', entity.item.outstanding.toString(), 'Edit outstanding balance')} />
           <EditableField label="EMI / Month" value={formatCurrency(entity.item.emiAmount)} onEdit={() => openEditDialog(entity, 'EMI / Month', entity.item.emiAmount.toString(), 'Edit EMI amount')} />
           <EditableField label="Next EMI" value={formatDisplayDate(entity.item.nextEmiDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Next EMI', entity.item.nextEmiDate || '', 'Edit next EMI date')} />
           <EditableField label="Remaining Months" value={String((entity.item.emiCount ?? 0) - (entity.item.paidCount ?? 0))} onEdit={() => openEditDialog(entity, 'Remaining Months', String((entity.item.emiCount ?? 0) - (entity.item.paidCount ?? 0)), 'Edit remaining months')} />
@@ -506,7 +532,7 @@ export function EditPage() {
         title={dialog.title ?? "Edit field"}
         description={dialog.description}
         value={dialog.value ?? ""}
-        type={dialog.field === 'Due Date' || dialog.field === 'Next Bill Date' || dialog.field === 'Next EMI' ? 'date' : dialog.field === 'Credit Limit' || dialog.field === 'Outstanding' || dialog.field === 'Unbilled' || dialog.field === 'Balance' || dialog.field === 'Total Loan' || dialog.field === 'Outstanding Balance' || dialog.field === 'EMI / Month' || dialog.field === 'Amount' || dialog.field === 'Remaining Months' ? 'number' : 'text'}
+        type={getDialogInputType(dialog.entity, dialog.field)}
         onClose={() => setDialog({ open: false })}
         onSave={handleDialogSave}
       />

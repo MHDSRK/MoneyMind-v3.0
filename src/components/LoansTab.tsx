@@ -23,7 +23,6 @@ export function LoansTab() {
 
   const visibleLoans = store.loans.filter((loan) => !loan.deleted && !loan.archivedAt);
   const totalOutstanding = visibleLoans.reduce((sum, loan) => sum + loan.outstanding, 0);
-  const totalEmi = visibleLoans.reduce((sum, loan) => sum + loan.emiAmount, 0);
 
   useEffect(() => {
     if (!location.startsWith("/loans")) return;
@@ -68,12 +67,11 @@ export function LoansTab() {
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Loans</h2>
-          <p className="text-sm text-muted-foreground">Tap a loan for details, swipe left to archive.</p>
         </div>
-        <div className="text-destructive text-2xl font-bold">{formatCurrency(totalOutstanding)}</div>
+        <div className="text-2xl font-bold text-destructive">{formatCurrency(totalOutstanding)}</div>
       </div>
 
       <MasterListSection label="Loans" total={totalOutstanding}>
@@ -88,10 +86,13 @@ export function LoansTab() {
             >
               <MasterListRow
                 name={loan.name}
-                subtitle={loan.lender || "Loan"}
                 amount={loan.outstanding}
                 onClick={() => setSelectedLoan(loan)}
                 onArchive={() => promptArchiveLoan(loan)}
+                amountClassName="text-destructive"
+                subtitle={loan.tag ? `${loan.tag}${loan.lender ? ` • ${loan.lender}` : ""}` : loan.lender || "Loan"}
+                secondaryText={`Next EMI • ${formatDisplayDate(loan.nextEmiDate, "Not set")}`}
+                secondaryTextClassName="text-muted-foreground"
               />
             </div>
           ))
@@ -101,48 +102,44 @@ export function LoansTab() {
       <RecordDetailsDialog
         open={Boolean(selectedLoan)}
         title={selectedLoan?.name ?? "Loan details"}
-        description="Review loan details and open payment history."
-        details={
+        description={selectedLoan ? `Next EMI • ${formatDisplayDate(selectedLoan.nextEmiDate, "Not set")}` : ""}
+        details={[]}
+        hideDetailsList
+        footerActions={
           selectedLoan
             ? [
-                { label: "Lender", value: selectedLoan.lender || "Not set" },
-                { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount) },
-                { label: "Remaining", value: `${selectedLoan.emiCount - selectedLoan.paidCount} months` },
-                { label: "Next EMI", value: formatDisplayDate(selectedLoan.nextEmiDate, "Not set") },
+                {
+                  key: "history",
+                  label: "History",
+                  variant: "secondary",
+                  onClick: () => setPaymentSheetLoanId(selectedLoan.id),
+                },
+                {
+                  key: "archive",
+                  label: "Archive",
+                  variant: "warning",
+                  onClick: () => promptArchiveLoan(selectedLoan),
+                },
+                {
+                  key: "close",
+                  label: "Close",
+                  variant: "primary",
+                  onClick: () => setSelectedLoan(null),
+                },
               ]
-            : []
-        }
-        actions={
-          selectedLoan ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={() => setPaymentSheetLoanId(selectedLoan.id)}
-                className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-foreground border border-white/10 hover:bg-white/10"
-              >
-                History
-              </button>
-              <button
-                type="button"
-                onClick={() => promptArchiveLoan(selectedLoan)}
-                className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-white hover:bg-destructive/90"
-              >
-                Archive
-              </button>
-            </div>
-          ) : null
+            : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedLoan(null) }]
         }
         onClose={() => setSelectedLoan(null)}
       >
         {selectedLoan ? (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Original Loan Amount</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(selectedLoan.principal)}</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-h-[92px] rounded-2xl border border-white/10 bg-white/10 p-4 text-foreground">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Loan Amount</p>
+              <p className="mt-2 text-xl font-semibold">{formatCurrency(selectedLoan.principal)}</p>
             </div>
-            <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive/80">Outstanding Balance</p>
-              <p className="mt-1 text-2xl font-semibold text-destructive">{formatCurrency(selectedLoan.outstanding)}</p>
+            <div className="min-h-[92px] rounded-2xl bg-destructive p-4 text-white">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive-foreground/80">Outstanding</p>
+              <p className="mt-2 text-xl font-semibold">{formatCurrency(selectedLoan.outstanding)}</p>
             </div>
           </div>
         ) : null}

@@ -10,7 +10,7 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
-import { formatDisplayDate } from "@/utils/date";
+import { formatDisplayDate, formatAppDate } from "@/utils/date";
 
 const GROUPS = ["Regular Expenses", "Chitty", "Borrow", "More Liabilities"];
 
@@ -103,9 +103,9 @@ export function LiabilitiesTab() {
 
           return (
             <AccordionItem key={group} value={group}>
-              <AccordionTrigger className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
-                <span>{group}</span>
-                <span className="text-sm font-bold">{formatCurrency(groupTotal)}</span>
+              <AccordionTrigger className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground">
+                <span className="min-w-0 flex-1 text-left">{group}</span>
+                <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(groupTotal)}</span>
               </AccordionTrigger>
               <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
                 {items.length === 0 ? (
@@ -117,13 +117,13 @@ export function LiabilitiesTab() {
                       ref={(element) => { liabilityRefs.current[item.id] = element; }}
                       className={highlightedId === item.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
                     >
-                      <MasterListRow
-                        name={item.name}
-                        subtitle={item.dueDate ? `Due ${item.dueDate}` : item.group}
-                        amount={item.amount}
-                        onClick={() => setSelectedLiability(item)}
-                        onArchive={() => promptArchiveLiability(item)}
-                      />
+                  <MasterListRow
+                    name={item.name}
+                    subtitle={item.dueDate ? `Due • ${formatAppDate(item.dueDate)}` : `Group • ${item.group}`}
+                    amount={item.amount}
+                    onClick={() => setSelectedLiability(item)}
+                    onArchive={() => promptArchiveLiability(item)}
+                  />
                     </div>
                   ))
                 )}
@@ -189,25 +189,29 @@ export function LiabilitiesTab() {
               ]
             : []
         }
-        actions={
-          selectedLiability ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={() => selectedLiability && setPaymentSheetItemId(selectedLiability.id)}
-                className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-foreground border border-white/10 hover:bg-white/10"
-              >
-                History
-              </button>
-              <button
-                type="button"
-                onClick={() => selectedLiability && promptArchiveLiability(selectedLiability)}
-                className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-white hover:bg-destructive/90"
-              >
-                Archive
-              </button>
-            </div>
-          ) : null
+        footerActions={
+          selectedLiability
+            ? [
+                {
+                  key: "history",
+                  label: "History",
+                  variant: "secondary",
+                  onClick: () => setPaymentSheetItemId(selectedLiability.id),
+                },
+                {
+                  key: "archive",
+                  label: "Archive",
+                  variant: "warning",
+                  onClick: () => promptArchiveLiability(selectedLiability),
+                },
+                {
+                  key: "close",
+                  label: "Close",
+                  variant: "primary",
+                  onClick: () => setSelectedLiability(null),
+                },
+              ]
+            : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedLiability(null) }]
         }
         onClose={() => setSelectedLiability(null)}
       />

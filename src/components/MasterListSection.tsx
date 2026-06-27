@@ -12,11 +12,11 @@ interface MasterListSectionProps {
 export function MasterListSection({ label, total, children, onAddNew }: MasterListSectionProps) {
   return (
     <section className="border-b border-white/10 pb-4">
-      <div className="flex items-center justify-between gap-4 py-2">
-        <div>
+      <div className="flex w-full items-center justify-between gap-4 py-2">
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
         </div>
-        <div className="ml-auto text-right text-sm font-bold text-foreground">{formatCurrency(total)}</div>
+        <div className="ml-auto flex-shrink-0 text-right text-sm font-bold text-foreground">{formatCurrency(total)}</div>
       </div>
       <div className="divide-y divide-white/10 overflow-hidden rounded-none bg-transparent">
         {children}

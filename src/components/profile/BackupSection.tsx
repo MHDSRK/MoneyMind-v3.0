@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useStore } from "@/hooks/useStore";
 import { Download, ChevronDown, ChevronRight } from "lucide-react";
 import * as backupService from "@/lib/backupService";
-import { format } from "date-fns";
+import { formatAppDate } from "@/utils/date";
 
 export function BackupSection() {
   const { store, updateStore } = useStore();
@@ -129,7 +129,7 @@ export function BackupSection() {
             </div>
             {lastAutoBackupTime && (
               <p className="text-xs text-muted-foreground">
-                Last backup: {format(new Date(lastAutoBackupTime), "MMM d, yyyy HH:mm")}
+                Last backup: {formatAppDate(lastAutoBackupTime)}
               </p>
             )}
           </div>
@@ -169,7 +169,7 @@ export function BackupSection() {
                       {idx === 0 ? "Latest" : ""} {backup.fileName}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
-                      {format(new Date(backup.timestamp), "MMM d, yyyy HH:mm")}
+                      {formatAppDate(backup.timestamp)}
                     </p>
                     <div className="flex gap-1">
                       <button
