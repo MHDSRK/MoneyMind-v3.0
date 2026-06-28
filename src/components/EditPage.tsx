@@ -256,6 +256,11 @@ export function EditPage() {
           case 'Due Date':
             change.dueDate = value;
             break;
+          case 'Notes': {
+            const trimmed = value.trim();
+            change.notes = trimmed.slice(0, 1000);
+            break;
+          }
         }
         return updateLiability(prev, entity.item.id, change);
       }
@@ -338,6 +343,7 @@ export function EditPage() {
           <EditableField label="Expense Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Expense Name', entity.item.name, 'Edit expense name')} />
           <EditableField label="Amount" value={formatCurrency(entity.item.amount)} onEdit={() => openEditDialog(entity, 'Amount', entity.item.amount.toString(), 'Edit amount')} />
           <EditableField label="Due Date" value={entity.item.dueDate || 'Not set'} onEdit={() => openEditDialog(entity, 'Due Date', entity.item.dueDate || '', 'Edit due date')} />
+          <EditableField label="Notes" value={entity.item.notes?.trim() ? entity.item.notes : 'Not set'} onEdit={() => openEditDialog(entity, 'Notes', entity.item.notes || '', 'Edit notes')} />
         </EditAccordion>
       );
     }
