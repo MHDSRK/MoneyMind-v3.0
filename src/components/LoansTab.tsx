@@ -1,7 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { useStore, Loan, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
-import { MasterListSection } from "@/components/MasterListSection";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -74,7 +73,7 @@ export function LoansTab() {
         <div className="text-2xl font-bold text-destructive">{formatCurrency(totalOutstanding)}</div>
       </div>
 
-      <MasterListSection label="Loans" total={totalOutstanding}>
+      <div className="divide-y divide-white/10 overflow-hidden rounded-none bg-transparent">
         {visibleLoans.length === 0 ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">No active loans yet. Add one to begin.</div>
         ) : (
@@ -97,14 +96,22 @@ export function LoansTab() {
             </div>
           ))
         )}
-      </MasterListSection>
+      </div>
 
       <RecordDetailsDialog
         open={Boolean(selectedLoan)}
         title={selectedLoan?.name ?? "Loan details"}
         description={selectedLoan ? `Next EMI • ${formatDisplayDate(selectedLoan.nextEmiDate, "Not set")}` : ""}
-        details={[]}
-        hideDetailsList
+        details={
+          selectedLoan
+            ? [
+                { label: "Loan Amount", value: formatCurrency(selectedLoan.principal) },
+                { label: "Outstanding", value: formatCurrency(selectedLoan.outstanding) },
+                { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount) },
+                { label: "Lender", value: selectedLoan.lender || "Not set" },
+              ]
+            : []
+        }
         footerActions={
           selectedLoan
             ? [
@@ -130,20 +137,7 @@ export function LoansTab() {
             : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedLoan(null) }]
         }
         onClose={() => setSelectedLoan(null)}
-      >
-        {selectedLoan ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="min-h-[92px] rounded-2xl border border-white/10 bg-white/10 p-4 text-foreground">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Loan Amount</p>
-              <p className="mt-2 text-xl font-semibold">{formatCurrency(selectedLoan.principal)}</p>
-            </div>
-            <div className="min-h-[92px] rounded-2xl bg-destructive p-4 text-white">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive-foreground/80">Outstanding</p>
-              <p className="mt-2 text-xl font-semibold">{formatCurrency(selectedLoan.outstanding)}</p>
-            </div>
-          </div>
-        ) : null}
-      </RecordDetailsDialog>
+      />
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveLoan()}>
         <AlertDialogContent>

@@ -147,6 +147,7 @@ export function EditPage() {
           name: "New Item",
           amount: 0,
           dueDate: "",
+          notes: "",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -210,6 +211,12 @@ export function EditPage() {
       if (entity.type === 'loan') {
         const change: Partial<Loan> = {};
         switch (field) {
+          case 'Provider': {
+            const trimmed = value.trim();
+            if (!trimmed) return prev;
+            change.lender = trimmed.slice(0, 100);
+            break;
+          }
           case 'Loan Name':
             change.name = value;
             break;
@@ -313,6 +320,7 @@ export function EditPage() {
     if (entity.type === 'loan') {
       return (
         <EditAccordion key={id} label={entity.item.name} isOpen={isOpen} onToggle={toggle}>
+          <EditableField label="Provider" value={entity.item.lender || 'Not set'} onEdit={() => openEditDialog(entity, 'Provider', entity.item.lender || '', 'Edit loan provider')} />
           <EditableField label="Loan Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Loan Name', entity.item.name, 'Edit loan name')} />
           <EditableField label="Tag" value={entity.item.tag || 'Not set'} onEdit={() => openEditDialog(entity, 'Tag', entity.item.tag || '', 'Edit loan tag')} />
           <EditableField label="Loan Amount" value={formatCurrency(entity.item.principal)} onEdit={() => openEditDialog(entity, 'Total Loan', entity.item.principal.toString(), 'Edit total loan amount')} />

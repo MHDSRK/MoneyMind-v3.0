@@ -3,7 +3,6 @@ import { useStore, CreditCard, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import { createUnbilledTransaction } from "@/lib/transactionEffects";
 import { getCreditCardAvailableAmount, getCreditCardDueAmount } from "@/lib/calculations";
-import { MasterListSection } from "@/components/MasterListSection";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -29,10 +28,6 @@ export function CreditCardsTab() {
 
   const visibleCards = store.creditCards.filter((card) => !card.deleted && !card.archivedAt);
   const totalDue = visibleCards.reduce((sum, card) => sum + getCreditCardDueAmount(card), 0);
-  const totalLimit = visibleCards.reduce((sum, card) => sum + card.creditLimit, 0);
-  const totalOutstanding = visibleCards.reduce((sum, card) => sum + card.outstanding, 0);
-  const totalUnbilled = visibleCards.reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
-  const totalAvailable = totalLimit - totalOutstanding - totalUnbilled;
 
   useEffect(() => {
     if (!location.startsWith("/cards")) return;
@@ -110,7 +105,7 @@ export function CreditCardsTab() {
         </div>
       </div>
 
-      <MasterListSection label="Credit Cards" total={totalDue}>
+      <div className="divide-y divide-white/10 overflow-hidden rounded-none bg-transparent">
         {visibleCards.length === 0 ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">No active credit cards yet. Add one to begin.</div>
         ) : (
@@ -133,28 +128,34 @@ export function CreditCardsTab() {
             </div>
           ))
         )}
-      </MasterListSection>
+      </div>
 
       <RecordDetailsDialog
         open={Boolean(selectedCard)}
         title={selectedCard?.name ?? "Card details"}
         description={selectedCard ? `Due Date • ${formatDisplayDate(selectedCard.nextDueDate, "Not set")}` : ""}
-        details={[]}
-        hideDetailsList
+        details={
+          selectedCard
+            ? [
+                { label: "Available", value: formatCurrency(cardAvailable(selectedCard)) },
+                { label: "Due", value: formatCurrency(cardDueAmount(selectedCard)) },
+              ]
+            : []
+        }
         footerActions={
           selectedCard
             ? [
-                {
-                  key: "add-unbilled",
-                  label: "Add Unbilled",
-                  variant: "secondary",
-                  onClick: () => openQuickAdd(selectedCard.id),
-                },
                 {
                   key: "history",
                   label: "History",
                   variant: "secondary",
                   onClick: () => setPaymentSheetCardId(selectedCard.id),
+                },
+                {
+                  key: "add-unbilled",
+                  label: "Add Unbilled",
+                  variant: "secondary",
+                  onClick: () => openQuickAdd(selectedCard.id),
                 },
                 {
                   key: "archive",
@@ -172,20 +173,7 @@ export function CreditCardsTab() {
             : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedCard(null) }]
         }
         onClose={() => setSelectedCard(null)}
-      >
-        {selectedCard ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="min-h-[92px] rounded-2xl bg-primary p-4 text-white">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-primary-foreground/80">Available</p>
-              <p className="mt-2 text-xl font-semibold">{formatCurrency(cardAvailable(selectedCard))}</p>
-            </div>
-            <div className="min-h-[92px] rounded-2xl bg-destructive p-4 text-white">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-destructive-foreground/80">Due</p>
-              <p className="mt-2 text-xl font-semibold">{formatCurrency(cardDueAmount(selectedCard))}</p>
-            </div>
-          </div>
-        ) : null}
-      </RecordDetailsDialog>
+      />
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveCard()}>
         <AlertDialogContent>

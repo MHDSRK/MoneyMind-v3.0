@@ -91,7 +91,6 @@ export function LiabilitiesTab() {
       <div className="flex items-center justify-between mb-2">
         <div>
           <h2 className="text-2xl font-bold text-foreground">More</h2>
-          <p className="text-sm text-muted-foreground">Tap an item to view details, swipe left to archive.</p>
         </div>
         <div className="text-2xl font-bold text-destructive">{formatCurrency(totalLiabilities)}</div>
       </div>
@@ -185,7 +184,7 @@ export function LiabilitiesTab() {
                 { label: "Amount", value: formatCurrency(selectedLiability.amount) },
                 { label: "Group", value: selectedLiability.group },
                 { label: "Due Date", value: selectedLiability.dueDate || "Not set" },
-                { label: "Created", value: formatDisplayDate(selectedLiability.createdAt, "Unknown") },
+                { label: "Notes", value: selectedLiability.notes?.trim() ? selectedLiability.notes : "Not set" },
               ]
             : []
         }

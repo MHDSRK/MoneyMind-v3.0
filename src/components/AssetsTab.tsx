@@ -24,17 +24,16 @@ export function AssetsTab() {
   const businessAccounts = visibleAccounts.filter((a) => a.type === "business");
   const investmentAccounts = visibleAccounts.filter((a) => a.type === "investments" || a.type === "investment");
   const insuranceAccounts = visibleAccounts.filter((a) => a.type === "insurance");
-  const otherAccounts = visibleAccounts.filter((a) => a.type === "other");
-  const lentAccounts = otherAccounts.filter((account) => isTrackingAccount(account));
-  const nonTrackingOtherAccounts = otherAccounts.filter((account) => !isTrackingAccount(account));
+  const lentAccounts = visibleAccounts.filter(
+    (account) => account.type === "other" && isTrackingAccount(account)
+  );
 
   const bankTotal = bankAccounts.reduce((sum, account) => sum + account.balance, 0);
   const businessTotal = businessAccounts.reduce((sum, account) => sum + account.balance, 0);
   const investmentTotal = investmentAccounts.reduce((sum, account) => sum + account.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, account) => sum + account.balance, 0);
   const lentTotal = lentAccounts.reduce((sum, account) => sum + account.balance, 0);
-  const nonTrackingOtherTotal = nonTrackingOtherAccounts.reduce((sum, account) => sum + account.balance, 0);
-  const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal + nonTrackingOtherTotal;
+  const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
   const [expandedSection, setExpandedSection] = useState<string | undefined>("bank");
 
   useEffect(() => {

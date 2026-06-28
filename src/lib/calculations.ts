@@ -56,6 +56,10 @@ export function isTrackingAccount(account: { name?: string }): boolean {
   return isTrackingLabel(account.name);
 }
 
+export function isFinancialAccount(account: { deleted?: boolean; archivedAt?: string; name?: string }): boolean {
+  return !account.deleted && !account.archivedAt && !isTrackingAccount(account);
+}
+
 export function isTrackingTransaction(transaction: Transaction): boolean {
   const candidates = [
     transaction.category,
@@ -173,28 +177,33 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // ─────────────────────────────────────────────────────────────────────────────
   // Account Balances by Type
   // ─────────────────────────────────────────────────────────────────────────────
-  const cashBalance = store.accounts
-    .filter((a) => a.type === "cash" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
+  const activeFinancialAccounts = store.accounts.filter(isFinancialAccount);
+  const activeCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
+  const activeLoans = store.loans.filter((l) => !l.deleted && !l.archivedAt);
+  const activeLiabilities = store.liabilities.filter((item) => !item.deleted && !item.archivedAt);
+
+  const cashBalance = activeFinancialAccounts
+    .filter((a) => a.type === "cash")
     .reduce((sum, a) => sum + a.balance, 0);
 
-  const bankBalance = store.accounts
-    .filter((a) => a.type === "bank" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
+  const bankBalance = activeFinancialAccounts
+    .filter((a) => a.type === "bank")
     .reduce((sum, a) => sum + a.balance, 0);
 
-  const businessBalance = store.accounts
-    .filter((a) => a.type === "business" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
+  const businessBalance = activeFinancialAccounts
+    .filter((a) => a.type === "business")
     .reduce((sum, a) => sum + a.balance, 0);
 
-  const investmentsBalance = store.accounts
-    .filter((a) => a.type === "investments" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
+  const investmentsBalance = activeFinancialAccounts
+    .filter((a) => a.type === "investments")
     .reduce((sum, a) => sum + a.balance, 0);
 
-  const insuranceBalance = store.accounts
-    .filter((a) => a.type === "insurance" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
+  const insuranceBalance = activeFinancialAccounts
+    .filter((a) => a.type === "insurance")
     .reduce((sum, a) => sum + a.balance, 0);
 
-  const otherAssetsBalance = store.accounts
-    .filter((a) => a.type === "other" && !a.deleted && !a.archivedAt && !isTrackingAccount(a))
+  const otherAssetsBalance = activeFinancialAccounts
+    .filter((a) => a.type === "other")
     .reduce((sum, a) => sum + a.balance, 0);
 
   const totalAssets =
@@ -203,17 +212,11 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // ─────────────────────────────────────────────────────────────────────────────
   // Credit Card Metrics
   // ─────────────────────────────────────────────────────────────────────────────
-  const creditCardOutstanding = store.creditCards
-    .filter((c) => !c.deleted && !c.archivedAt)
-    .reduce((sum, c) => sum + c.outstanding, 0);
+  const creditCardOutstanding = activeCreditCards.reduce((sum, c) => sum + c.outstanding, 0);
 
-  const creditCardUnbilled = store.creditCards
-    .filter((card) => !card.deleted && !card.archivedAt)
-    .reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
+  const creditCardUnbilled = activeCreditCards.reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
 
-  const creditCardTotalLimit = store.creditCards
-    .filter((c) => !c.deleted && !c.archivedAt)
-    .reduce((sum, c) => sum + c.creditLimit, 0);
+  const creditCardTotalLimit = activeCreditCards.reduce((sum, c) => sum + c.creditLimit, 0);
 
   const creditCardAvailableLimit =
     creditCardTotalLimit -
@@ -223,17 +226,11 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // ─────────────────────────────────────────────────────────────────────────────
   // Loan Metrics
   // ─────────────────────────────────────────────────────────────────────────────
-  const loanOutstanding = store.loans
-    .filter((l) => !l.deleted && !l.archivedAt)
-    .reduce((sum, l) => sum + l.outstanding, 0);
+  const loanOutstanding = activeLoans.reduce((sum, l) => sum + l.outstanding, 0);
 
-  const loanTotalPrincipal = store.loans
-    .filter((l) => !l.deleted && !l.archivedAt)
-    .reduce((sum, l) => sum + l.principal, 0);
+  const loanTotalPrincipal = activeLoans.reduce((sum, l) => sum + l.principal, 0);
 
-  const manualLiabilities = store.liabilities
-    .filter((item) => !item.deleted && !item.archivedAt)
-    .reduce((sum, item) => sum + item.amount, 0);
+  const manualLiabilities = activeLiabilities.reduce((sum, item) => sum + item.amount, 0);
 
   const totalLiabilities = creditCardOutstanding + loanOutstanding + manualLiabilities;
 

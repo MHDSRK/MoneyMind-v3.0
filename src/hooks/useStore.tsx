@@ -105,6 +105,7 @@ export interface LiabilityItem {
   name: string;
   amount: number;
   dueDate: string;
+  notes?: string;
   deleted?: boolean;
   archivedAt?: string;
   isArchived?: boolean;
@@ -349,6 +350,46 @@ function updateRecord<T extends { createdAt?: string; updatedAt?: string }>(
 }
 
 type TrackableItem = { id: string; deleted?: boolean; archivedAt?: string; createdAt?: string; updatedAt?: string; isArchived?: boolean };
+
+function preserveArchivedItems<T extends TrackableItem>(prevItems: T[], nextItems: T[]): T[] {
+  const prevItemsById = new Map(prevItems.map((item) => [item.id, item]));
+  const nextItemsById = new Map(nextItems.map((item) => [item.id, item]));
+
+  const mergedItems = nextItems.map((nextItem) => {
+    const prevItem = prevItemsById.get(nextItem.id);
+
+    if (!prevItem?.archivedAt) {
+      return nextItem;
+    }
+
+    if (!nextItem.archivedAt) {
+      return nextItem;
+    }
+
+    return prevItem;
+  });
+
+  for (const prevItem of prevItems) {
+    if (prevItem.archivedAt && !nextItemsById.has(prevItem.id)) {
+      mergedItems.push(prevItem);
+    }
+  }
+
+  return mergedItems;
+}
+
+export function freezeArchivedRecords(prev: Store, next: Store): Store {
+  return {
+    ...next,
+    accounts: preserveArchivedItems(prev.accounts, next.accounts),
+    creditCards: preserveArchivedItems(prev.creditCards, next.creditCards),
+    loans: preserveArchivedItems(prev.loans, next.loans),
+    liabilities: preserveArchivedItems(prev.liabilities, next.liabilities),
+    lends: preserveArchivedItems(prev.lends, next.lends),
+    categories: preserveArchivedItems(prev.categories, next.categories),
+    transactions: preserveArchivedItems(prev.transactions, next.transactions),
+  };
+}
 
 function createHistoryEvent(event: Omit<HistoryEvent, "id" | "timestamp">): HistoryEvent {
   return {
@@ -1014,15 +1055,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const updateStore = (updater: (prev: Store) => Store) => {
     setStore((prev) => {
       const next = normalizeStore(updater(prev));
-      const events = buildHistoryEvents(prev, next);
+      const frozen = freezeArchivedRecords(prev, next);
+      const events = buildHistoryEvents(prev, frozen);
 
       if (events.length === 0) {
-        return next;
+        return frozen;
       }
 
       return {
-        ...next,
-        history: [...events, ...(next.history ?? [])].slice(0, 300),
+        ...frozen,
+        history: [...events, ...(frozen.history ?? [])].slice(0, 300),
       };
     });
   };
