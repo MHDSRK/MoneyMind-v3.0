@@ -137,11 +137,12 @@ export function CreditCardsTab() {
         details={
           selectedCard
             ? [
-                { label: "Available", value: formatCurrency(cardAvailable(selectedCard)) },
-                { label: "Due", value: formatCurrency(cardDueAmount(selectedCard)) },
+                { label: "Available", value: formatCurrency(cardAvailable(selectedCard)), valueClassName: "text-primary" },
+                { label: "Due", value: formatCurrency(cardDueAmount(selectedCard)), valueClassName: "text-destructive" },
               ]
             : []
         }
+        plainDetails
         footerActions={
           selectedCard
             ? [

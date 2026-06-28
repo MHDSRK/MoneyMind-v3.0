@@ -213,7 +213,6 @@ export function EditPage() {
         switch (field) {
           case 'Provider': {
             const trimmed = value.trim();
-            if (!trimmed) return prev;
             change.lender = trimmed.slice(0, 100);
             break;
           }

@@ -105,13 +105,14 @@ export function LoansTab() {
         details={
           selectedLoan
             ? [
-                { label: "Loan Amount", value: formatCurrency(selectedLoan.principal) },
-                { label: "Outstanding", value: formatCurrency(selectedLoan.outstanding) },
-                { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount) },
-                { label: "Lender", value: selectedLoan.lender || "Not set" },
+                { label: "Loan Amount", value: formatCurrency(selectedLoan.principal), valueClassName: "text-foreground" },
+                { label: "Outstanding", value: formatCurrency(selectedLoan.outstanding), valueClassName: "text-destructive" },
+                { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount), valueClassName: "text-foreground" },
+                { label: "Lender", value: selectedLoan.lender || "Not set", valueClassName: selectedLoan.lender ? "text-foreground" : "text-muted-foreground" },
               ]
             : []
         }
+        plainDetails
         footerActions={
           selectedLoan
             ? [

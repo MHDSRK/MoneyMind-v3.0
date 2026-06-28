@@ -13,6 +13,10 @@ interface EditDialogProps {
   onSave: (newValue: string) => void;
 }
 
+export function shouldClearOnFocus(currentValue: string) {
+  return ["0", "0.00", "₹0.00", "Not set"].includes(currentValue.trim());
+}
+
 export function EditDialog({
   open,
   title,
@@ -46,6 +50,11 @@ export function EditDialog({
             value={draft}
             placeholder={placeholder}
             onChange={(event) => setDraft(event.target.value)}
+            onFocus={() => {
+              if (shouldClearOnFocus(draft)) {
+                setDraft("");
+              }
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
