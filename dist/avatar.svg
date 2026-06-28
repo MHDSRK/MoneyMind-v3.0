@@ -1,0 +1,73 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="neon-glow-profile">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      @keyframes glow-pulse {
+        0%, 100% { 
+          opacity: 1;
+          filter: drop-shadow(0 0 8px #22d3ee) drop-shadow(0 0 16px #0891b2) drop-shadow(0 0 24px rgba(34,211,238,0.4));
+        }
+        50% { 
+          opacity: 0.9;
+          filter: drop-shadow(0 0 12px #22d3ee) drop-shadow(0 0 24px #0891b2) drop-shadow(0 0 32px rgba(34,211,238,0.6));
+        }
+      }
+      @keyframes orbit {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .profile-glow {
+        animation: glow-pulse 3s ease-in-out infinite;
+      }
+      .orbit-accent {
+        transform-origin: 100px 100px;
+        animation: orbit 8s linear infinite;
+        opacity: 0.5;
+      }
+    </style>
+  </defs>
+  
+  <!-- Background rounded square with glow -->
+  <rect x="15" y="15" width="170" height="170" rx="36" fill="#000814" stroke="#0891b2" stroke-width="2" opacity="0.4" filter="url(#neon-glow-profile)"/>
+  
+  <!-- Orbiting accent circle -->
+  <g class="orbit-accent">
+    <circle cx="100" cy="35" r="4" fill="#22d3ee"/>
+  </g>
+  
+  <!-- Profile icon with enhanced glow -->
+  <g class="profile-glow">
+    <!-- Head circle - larger and cleaner -->
+    <circle cx="100" cy="68" r="26" fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round"/>
+    
+    <!-- Hair/top accent -->
+    <path d="M 74 68 Q 74 45 100 38 Q 126 45 126 68" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Subtle facial features (eyes suggestion) -->
+    <circle cx="92" cy="64" r="2" fill="#22d3ee" opacity="0.7"/>
+    <circle cx="108" cy="64" r="2" fill="#22d3ee" opacity="0.7"/>
+    
+    <!-- Neck definition -->
+    <line x1="95" y1="92" x2="92" y2="110" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="105" y1="92" x2="108" y2="110" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round"/>
+    
+    <!-- Shoulders with better curve -->
+    <path d="M 55 110 Q 100 125 145 110" fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Body torso - streamlined -->
+    <path d="M 62 110 L 68 165 L 132 165 L 138 110" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Collar accent - refined -->
+    <path d="M 90 110 Q 100 120 110 110" fill="none" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Chest detail lines -->
+    <line x1="95" y1="120" x2="95" y2="135" stroke="#22d3ee" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+    <line x1="105" y1="120" x2="105" y2="135" stroke="#22d3ee" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  </g>
+</svg>
