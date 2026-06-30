@@ -3,7 +3,6 @@ import { useStore, CreditCard, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import { createUnbilledTransaction } from "@/lib/transactionEffects";
 import { getCreditCardAvailableAmount, getCreditCardDueAmount } from "@/lib/calculations";
-import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -115,16 +114,78 @@ export function CreditCardsTab() {
               ref={(element) => { cardRefs.current[card.id] = element; }}
               className={highlightedId === card.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
             >
-              <MasterListRow
-                name={card.name}
-                subtitle={card.provider || card.cardType || "Credit card"}
-                amount={cardDueAmount(card)}
+              <div
                 onClick={() => setSelectedCard(card)}
-                onArchive={() => promptArchiveCard(card)}
-                amountClassName="text-destructive"
-                secondaryText={`Due • ${formatDisplayDate(card.nextDueDate, "Not set")}`}
-                secondaryTextClassName="text-muted-foreground"
-              />
+                className="group cursor-pointer rounded-3xl border border-white/10 bg-white/5 p-4 transition hover:border-primary/40 hover:bg-white/10"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{card.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground truncate">{card.provider || card.cardType || "Credit card"}</p>
+                  </div>
+                  <div className="text-right min-w-[120px]">
+                    <p className="text-sm font-semibold text-muted-foreground">{formatCurrency(card.creditLimit)}</p>
+                    <p className="mt-3 text-xl font-semibold text-sky-400">{formatCurrency(cardAvailable(card))}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="rounded-2xl bg-white/5 p-3">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">DUE</p>
+                    <p className="mt-2 text-sm font-semibold text-destructive">{formatCurrency(cardDueAmount(card))}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 p-3">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Due Date</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{card.dueDate}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 p-3">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Unbilled</p>
+                    <p className="mt-2 text-sm font-semibold text-amber-400">{formatCurrency(card.unbilled ?? 0)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-1 items-center gap-2 rounded-2xl bg-white/5 px-3 py-2">
+                    <span className="text-sm text-muted-foreground">₹</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={quickAddCardId === card.id ? quickAddAmount : ""}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openQuickAdd(card.id);
+                      }}
+                      onChange={(event) => {
+                        event.stopPropagation();
+                        openQuickAdd(card.id);
+                        setQuickAddAmount(event.target.value);
+                      }}
+                      placeholder="Amount"
+                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-transparent px-2 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (quickAddCardId !== card.id) {
+                          openQuickAdd(card.id);
+                          return;
+                        }
+                        confirmQuickAdd();
+                      }}
+                      className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">NEXT BILL</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{formatDisplayDate(card.nextDueDate, "Not set")}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           ))
         )}

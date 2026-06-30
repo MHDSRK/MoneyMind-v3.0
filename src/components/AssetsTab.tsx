@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useStore, Account, archiveRecord } from "@/hooks/useStore";
+import { useStore, Account, LendItem, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
@@ -7,15 +7,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { isTrackingAccount } from "@/lib/calculations";
+import { isLentAccount } from "@/lib/calculations";
 import { formatDisplayDate } from "@/utils/date";
 
 export function AssetsTab() {
   const { store, updateStore } = useStore();
   const [location] = useLocation();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [selectedLend, setSelectedLend] = useState<LendItem | null>(null);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [accountPendingArchive, setAccountPendingArchive] = useState<Account | null>(null);
+  const [lendPendingArchive, setLendPendingArchive] = useState<LendItem | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const accountRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -24,15 +26,13 @@ export function AssetsTab() {
   const businessAccounts = visibleAccounts.filter((a) => a.type === "business");
   const investmentAccounts = visibleAccounts.filter((a) => a.type === "investments" || a.type === "investment");
   const insuranceAccounts = visibleAccounts.filter((a) => a.type === "insurance");
-  const lentAccounts = visibleAccounts.filter(
-    (account) => account.type === "other" && isTrackingAccount(account)
-  );
+  const activeLends = store.lends.filter((lend) => !lend.deleted && !lend.archivedAt);
 
   const bankTotal = bankAccounts.reduce((sum, account) => sum + account.balance, 0);
   const businessTotal = businessAccounts.reduce((sum, account) => sum + account.balance, 0);
   const investmentTotal = investmentAccounts.reduce((sum, account) => sum + account.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, account) => sum + account.balance, 0);
-  const lentTotal = lentAccounts.reduce((sum, account) => sum + account.balance, 0);
+  const lentTotal = activeLends.reduce((sum, lend) => sum + lend.amount, 0);
   const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
   const [expandedSection, setExpandedSection] = useState<string | undefined>("bank");
 
@@ -67,34 +67,56 @@ export function AssetsTab() {
 
   const promptArchiveAccount = (account: Account) => {
     setAccountPendingArchive(account);
+    setLendPendingArchive(null);
+    setArchiveDialogOpen(true);
+  };
+
+  const promptArchiveLend = (lend: LendItem) => {
+    setLendPendingArchive(lend);
+    setAccountPendingArchive(null);
     setArchiveDialogOpen(true);
   };
 
   const confirmArchiveAccount = () => {
-    if (!accountPendingArchive) return;
+    if (accountPendingArchive) {
+      updateStore((prev) => ({
+        ...prev,
+        accounts: archiveRecord(prev.accounts, accountPendingArchive.id),
+      }));
 
-    updateStore((prev) => ({
-      ...prev,
-      accounts: archiveRecord(prev.accounts, accountPendingArchive.id),
-    }));
+      toast({ title: "Account archived", description: "The account was archived and removed from active totals." });
+      setArchiveDialogOpen(false);
+      setAccountPendingArchive(null);
+      return;
+    }
 
-    toast({ title: "Account archived", description: "The account was archived and removed from active totals." });
-    setArchiveDialogOpen(false);
-    setAccountPendingArchive(null);
+    if (lendPendingArchive) {
+      updateStore((prev) => ({
+        ...prev,
+        lends: archiveRecord(prev.lends, lendPendingArchive.id),
+      }));
+
+      toast({ title: "Lent record archived", description: "The lent record was archived and removed from active totals." });
+      setArchiveDialogOpen(false);
+      setLendPendingArchive(null);
+    }
   };
 
   const cancelArchiveAccount = () => {
     setArchiveDialogOpen(false);
     setAccountPendingArchive(null);
+    setLendPendingArchive(null);
   };
 
   const openAccountDetails = (account: Account) => {
-    if (isTrackingAccount(account)) {
+    if (isLentAccount(account)) {
       setSelectedAccount(account);
     }
   };
 
-  const isLentAccount = (account: Account) => isTrackingAccount(account);
+  const openLendDetails = (lend: LendItem) => {
+    setSelectedLend(lend);
+  };
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">
@@ -228,22 +250,22 @@ export function AssetsTab() {
             <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(lentTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
-            {lentAccounts.length === 0 ? (
+            {activeLends.length === 0 ? (
               <div className="px-4 py-4 text-sm text-muted-foreground">No lent accounts yet.</div>
             ) : (
-              lentAccounts.map((account) => (
+              activeLends.map((lend) => (
                 <div
-                  key={account.id}
-                  ref={(element) => { accountRefs.current[account.id] = element; }}
-                  className={highlightedId === account.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                  key={lend.id}
+                  ref={(element) => { accountRefs.current[lend.id] = element; }}
+                  className={highlightedId === lend.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
                 >
                   <MasterListRow
-                    name={account.name}
+                    name={lend.name}
                     subtitle="Lent"
-                    amount={account.balance}
-                    onClick={() => openAccountDetails(account)}
-                    onArchive={() => promptArchiveAccount(account)}
-                    interactive={isLentAccount(account)}
+                    amount={lend.amount}
+                    onClick={() => openLendDetails(lend)}
+                    onArchive={() => promptArchiveLend(lend)}
+                    interactive={true}
                   />
                 </div>
               ))
@@ -253,11 +275,17 @@ export function AssetsTab() {
       </Accordion>
 
       <RecordDetailsDialog
-        open={Boolean(selectedAccount && isLentAccount(selectedAccount))}
-        title={selectedAccount?.name ?? "Account details"}
-        description="Review lent account details and archive from here."
+        open={Boolean(selectedAccount || selectedLend)}
+        title={selectedLend?.name ?? selectedAccount?.name ?? "Details"}
+        description={selectedLend ? "Review lent record details and archive from here." : "Review lent account details and archive from here."}
         details={
-          selectedAccount && isLentAccount(selectedAccount)
+          selectedLend
+            ? [
+                { label: "Name", value: selectedLend.name },
+                { label: "Amount", value: formatCurrency(selectedLend.amount) },
+                { label: "Date", value: formatDisplayDate(selectedLend.date, "Unknown") },
+              ]
+            : selectedAccount && isLentAccount(selectedAccount)
             ? [
                 { label: "Name", value: selectedAccount.name },
                 { label: "Amount", value: formatCurrency(selectedAccount.balance) },
@@ -266,7 +294,22 @@ export function AssetsTab() {
             : []
         }
         footerActions={
-          selectedAccount
+          selectedLend
+            ? [
+                {
+                  key: "archive",
+                  label: "Archive",
+                  variant: "warning",
+                  onClick: () => promptArchiveLend(selectedLend),
+                },
+                {
+                  key: "close",
+                  label: "Close",
+                  variant: "primary",
+                  onClick: () => setSelectedLend(null),
+                },
+              ]
+            : selectedAccount
             ? [
                 {
                   key: "archive",
@@ -283,9 +326,19 @@ export function AssetsTab() {
               ]
             : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedAccount(null) }]
         }
-        onClose={() => setSelectedAccount(null)}
+        onClose={() => {
+          setSelectedAccount(null);
+          setSelectedLend(null);
+        }}
       >
-        {selectedAccount && isLentAccount(selectedAccount) ? (
+        {selectedLend ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Lent record</p>
+              <div className="text-sm text-foreground">This record is stored as a tracking Lent item.</div>
+            </div>
+          </div>
+        ) : selectedAccount && isLentAccount(selectedAccount) ? (
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="space-y-1">
               <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Notes</p>
@@ -300,7 +353,7 @@ export function AssetsTab() {
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveAccount()}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive "{accountPendingArchive?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>Archive "{accountPendingArchive?.name ?? lendPendingArchive?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>Archived items will no longer appear in active lists.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

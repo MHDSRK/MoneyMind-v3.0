@@ -1,10 +1,8 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { useStore, Loan, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
-import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { PaymentHistorySheet } from "@/components/PaymentHistorySheet";
@@ -77,24 +75,50 @@ export function LoansTab() {
         {visibleLoans.length === 0 ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">No active loans yet. Add one to begin.</div>
         ) : (
-          visibleLoans.map((loan) => (
-            <div
-              key={loan.id}
-              ref={(element) => { loanRefs.current[loan.id] = element; }}
-              className={highlightedId === loan.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-            >
-              <MasterListRow
-                name={loan.name}
-                amount={loan.outstanding}
-                onClick={() => setSelectedLoan(loan)}
-                onArchive={() => promptArchiveLoan(loan)}
-                amountClassName="text-destructive"
-                subtitle={loan.tag ? `${loan.tag}${loan.lender ? ` • ${loan.lender}` : ""}` : loan.lender || "Loan"}
-                secondaryText={`Next EMI • ${formatDisplayDate(loan.nextEmiDate, "Not set")}`}
-                secondaryTextClassName="text-muted-foreground"
-              />
-            </div>
-          ))
+          visibleLoans.map((loan) => {
+            const remainingMonths = Math.max(0, loan.remainingMonths ?? 0);
+            const subtitle = loan.tag ? `${loan.tag}${loan.lender ? ` • ${loan.lender}` : ""}` : loan.lender || "Loan";
+
+            return (
+              <div
+                key={loan.id}
+                ref={(element) => { loanRefs.current[loan.id] = element; }}
+                className={highlightedId === loan.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedLoan(loan)}
+                  className="w-full rounded-3xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-primary/40 hover:bg-white/10"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{loan.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground truncate">{subtitle}</p>
+                    </div>
+                    <div className="text-right min-w-[120px] text-right">
+                      <p className="mt-1 text-sm font-semibold text-muted-foreground">{formatCurrency(loan.principal)}</p>
+                      <p className="mt-3 text-lg font-semibold text-destructive">{formatCurrency(loan.outstanding)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-2xl bg-white/5 px-3 py-3">
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">EMI</p>
+                      <p className="mt-2 text-sm font-semibold text-sky-400">{formatCurrency(loan.emiAmount)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/5 px-3 py-3">
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">DATE</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">{formatDisplayDate(loan.nextEmiDate, "Not set")}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/5 px-3 py-3">
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Remaining</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">{remainingMonths} Months</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -107,8 +131,6 @@ export function LoansTab() {
             ? [
                 { label: "Loan Amount", value: formatCurrency(selectedLoan.principal), valueClassName: "text-foreground" },
                 { label: "Outstanding", value: formatCurrency(selectedLoan.outstanding), valueClassName: "text-destructive" },
-                { label: "EMI / Month", value: formatCurrency(selectedLoan.emiAmount), valueClassName: "text-foreground" },
-                { label: "Lender", value: selectedLoan.lender || "Not set", valueClassName: selectedLoan.lender ? "text-foreground" : "text-muted-foreground" },
               ]
             : []
         }

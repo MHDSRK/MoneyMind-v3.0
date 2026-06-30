@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeftRight, ArrowDownToLine, ArrowUpFromLine, Trash2 } from "lucide-react";
+import { ArrowLeftRight, ArrowDownToLine, ArrowUpFromLine, Trash2, Pencil } from "lucide-react";
 
 type TransactionMode = "in" | "out" | "self";
 
@@ -245,18 +245,19 @@ export function TodayTab() {
                   {tx.type === "out" ? formatCurrency(tx.amount) : "₹0.00"}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleEditTransaction(tx)}
-                    className="text-[10px] font-semibold uppercase tracking-wider text-primary hover:text-primary/80"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-primary transition hover:bg-white/10 hover:text-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    aria-label="Edit transaction"
                   >
-                    Edit
+                    <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteTransaction(tx)}
-                    className="inline-flex items-center justify-center rounded-md border border-transparent bg-transparent p-2 text-destructive transition hover:bg-destructive/10 hover:text-destructive/90"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-transparent text-destructive transition hover:bg-destructive/10 hover:text-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30"
                     aria-label="Delete transaction"
                   >
                     <Trash2 className="h-4 w-4" />

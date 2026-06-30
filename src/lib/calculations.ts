@@ -56,7 +56,11 @@ export function isTrackingAccount(account: { name?: string }): boolean {
   return isTrackingLabel(account.name);
 }
 
-export function isFinancialAccount(account: { deleted?: boolean; archivedAt?: string; name?: string }): boolean {
+export function isLentAccount(account: { name?: string }): boolean {
+  return isTrackingAccount(account);
+}
+
+export function isFinancialAccount(account: { deleted?: boolean; archivedAt?: string; name?: string; type?: string }): boolean {
   return !account.deleted && !account.archivedAt && !isTrackingAccount(account);
 }
 

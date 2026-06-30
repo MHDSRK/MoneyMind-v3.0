@@ -1,4 +1,3 @@
-import { Archive, Clock3, History, X } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,6 +27,8 @@ const variantClassName: Record<DetailsActionVariant, string> = {
 export function DetailsActionFooter({ actions = [], onClose, children }: DetailsActionFooterProps) {
   const renderedActions = actions.filter((action) => action.key !== "close");
   const closeAction = actions.find((action) => action.key === "close");
+
+  const CloseIcon = closeAction?.icon;
 
   return (
     <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-stretch">
@@ -61,7 +62,7 @@ export function DetailsActionFooter({ actions = [], onClose, children }: Details
             onClick={closeAction.onClick ?? onClose}
             className="h-11 flex-1 min-w-0 items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-medium"
           >
-            <X className="h-[18px] w-[18px]" />
+            {CloseIcon ? <CloseIcon className="h-[18px] w-[18px]" /> : null}
             <span>{closeAction.label}</span>
           </Button>
         ) : null}

@@ -1,11 +1,11 @@
 import { act } from "react-dom/test-utils";
 import { createRoot } from "react-dom/client";
 import { useEffect } from "react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { StoreProvider, useStore } from "@/hooks/useStore";
-import { AssetsTab } from "@/components/AssetsTab";
+import { TodayTab } from "@/components/TodayTab";
 
-function SeededAssetsTab() {
+function SeededTodayTab() {
   const { updateStore } = useStore();
 
   useEffect(() => {
@@ -23,13 +23,17 @@ function SeededAssetsTab() {
           updatedAt: new Date().toISOString(),
         },
       ],
-      lends: [
-        ...prev.lends,
+      transactions: [
+        ...prev.transactions,
         {
-          id: "lent-1",
-          name: "Lent",
-          amount: 500,
+          id: "tx-1",
           date: new Date().toISOString().split("T")[0],
+          ledger: "Monthly Salary Payment",
+          amount: 1000,
+          type: "in",
+          category: "Salary",
+          account: "Bank Account",
+          notes: "Salary receipt",
           deleted: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -38,11 +42,15 @@ function SeededAssetsTab() {
     }));
   }, [updateStore]);
 
-  return <AssetsTab />;
+  return <TodayTab />;
 }
 
-describe("AssetsTab", () => {
-  it("renders active tracking Lent accounts in the Lent section and excludes them from the total assets summary", () => {
+describe("TodayTab", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("renders icon-only edit and delete actions for today's cash flow rows", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -50,23 +58,25 @@ describe("AssetsTab", () => {
     act(() => {
       root.render(
         <StoreProvider>
-          <SeededAssetsTab />
+          <SeededTodayTab />
         </StoreProvider>,
       );
     });
 
-    const text = container.textContent ?? "";
+    const editButton = container.querySelector("button[aria-label='Edit transaction']");
+    const deleteButton = container.querySelector("button[aria-label='Delete transaction']");
 
-    expect(text).toContain("Assets");
-    expect(text).toContain("Lent");
-    expect(text).toContain("Bank Account");
-    expect(text).toContain("₹1,000.00");
-    expect(text).toContain("₹500.00");
-    expect(text).not.toContain("₹1,500.00");
+    expect(editButton).not.toBeNull();
+    expect(deleteButton).not.toBeNull();
+    expect(editButton?.querySelector("svg")).not.toBeNull();
+    expect(deleteButton?.querySelector("svg")).not.toBeNull();
+    expect(container.textContent).not.toContain("Edit\n");
+    expect(container.textContent).not.toContain("Edit ");
 
     act(() => {
       root.unmount();
     });
+
     container.remove();
   });
 });
