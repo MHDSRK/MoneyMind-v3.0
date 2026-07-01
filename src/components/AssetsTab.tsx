@@ -22,19 +22,28 @@ export function AssetsTab() {
   const accountRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const visibleAccounts = store.accounts.filter((account) => !account.deleted && !account.archivedAt);
-  const bankAccounts = visibleAccounts.filter((a) => a.type === "cash" || a.type === "bank");
-  const businessAccounts = visibleAccounts.filter((a) => a.type === "business");
-  const investmentAccounts = visibleAccounts.filter((a) => a.type === "investments" || a.type === "investment");
-  const insuranceAccounts = visibleAccounts.filter((a) => a.type === "insurance");
-  const activeLends = store.lends.filter((lend) => !lend.deleted && !lend.archivedAt);
+  const activeLendAccounts = visibleAccounts.filter(isLentAccount);
+  const financialAccounts = visibleAccounts.filter((account) => !isLentAccount(account));
+  const bankAccounts = financialAccounts.filter((a) => a.type === "cash" || a.type === "bank");
+  const businessAccounts = financialAccounts.filter((a) => a.type === "business");
+  const investmentAccounts = financialAccounts.filter((a) => a.type === "investments" || a.type === "investment");
+  const insuranceAccounts = financialAccounts.filter((a) => a.type === "insurance");
+  const activeLends = store.lends.filter((lend) => !lend.deleted && !lend.archivedAt && !lend.isArchived);
 
   const bankTotal = bankAccounts.reduce((sum, account) => sum + account.balance, 0);
   const businessTotal = businessAccounts.reduce((sum, account) => sum + account.balance, 0);
   const investmentTotal = investmentAccounts.reduce((sum, account) => sum + account.balance, 0);
   const insuranceTotal = insuranceAccounts.reduce((sum, account) => sum + account.balance, 0);
-  const lentTotal = activeLends.reduce((sum, lend) => sum + lend.amount, 0);
+  const activeLentRecords = [
+    ...activeLendAccounts.map((item) => ({ kind: "account" as const, item })),
+    ...activeLends.map((item) => ({ kind: "lend" as const, item })),
+  ];
+  const lentTotal = activeLentRecords.reduce(
+    (sum, record) => sum + (record.kind === "account" ? record.item.balance : record.item.amount),
+    0,
+  );
   const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
-  const [expandedSection, setExpandedSection] = useState<string | undefined>("bank");
+  const [expandedSection, setExpandedSection] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!location.startsWith("/assets")) {
@@ -250,25 +259,42 @@ export function AssetsTab() {
             <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(lentTotal)}</span>
           </AccordionTrigger>
           <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
-            {activeLends.length === 0 ? (
-              <div className="px-4 py-4 text-sm text-muted-foreground">No lent accounts yet.</div>
+            {activeLentRecords.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-muted-foreground">No lent records yet.</div>
             ) : (
-              activeLends.map((lend) => (
-                <div
-                  key={lend.id}
-                  ref={(element) => { accountRefs.current[lend.id] = element; }}
-                  className={highlightedId === lend.id ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
-                >
-                  <MasterListRow
-                    name={lend.name}
-                    subtitle="Lent"
-                    amount={lend.amount}
-                    onClick={() => openLendDetails(lend)}
-                    onArchive={() => promptArchiveLend(lend)}
-                    interactive={true}
-                  />
-                </div>
-              ))
+              activeLentRecords.map((record) => {
+                const lendId = record.item.id;
+                const amount = record.kind === "account" ? record.item.balance : record.item.amount;
+
+                return (
+                  <div
+                    key={lendId}
+                    ref={(element) => { accountRefs.current[lendId] = element; }}
+                    className={highlightedId === lendId ? "ring-2 ring-primary/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]" : ""}
+                  >
+                    <MasterListRow
+                      name={record.item.name}
+                      subtitle="Lent"
+                      amount={amount}
+                      onClick={() => {
+                        if (record.kind === "account") {
+                          openAccountDetails(record.item);
+                        } else {
+                          openLendDetails(record.item);
+                        }
+                      }}
+                      onArchive={() => {
+                        if (record.kind === "account") {
+                          promptArchiveAccount(record.item);
+                        } else {
+                          promptArchiveLend(record.item);
+                        }
+                      }}
+                      interactive={true}
+                    />
+                  </div>
+                );
+              })
             )}
           </AccordionContent>
         </AccordionItem>

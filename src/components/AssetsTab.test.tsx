@@ -31,6 +31,15 @@ function SeededAssetsTab() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
+        {
+          id: "lent-2",
+          name: "Lent to Ravi",
+          type: "bank",
+          balance: 500,
+          deleted: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
       ],
     }));
   }, [updateStore]);

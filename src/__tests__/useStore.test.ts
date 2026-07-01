@@ -119,4 +119,24 @@ describe("freezeArchivedRecords", () => {
     expect(frozen.accounts).toHaveLength(1);
     expect(frozen.accounts[0]).toEqual(previous.accounts[0]);
   });
+
+  it("preserves account notes during store normalization", () => {
+    const input = normalizeStore(
+      createStore({
+        accounts: [
+          {
+            id: "acct-2",
+            name: "Lent to Ravi",
+            type: "other",
+            balance: 100,
+            notes: "Paid on June 15",
+            deleted: false,
+          },
+        ],
+      })
+    );
+
+    expect(input.accounts).toHaveLength(1);
+    expect(input.accounts[0].notes).toBe("Paid on June 15");
+  });
 });

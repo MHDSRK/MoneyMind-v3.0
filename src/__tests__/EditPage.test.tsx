@@ -30,6 +30,33 @@ function SeededEditPage() {
 }
 
 describe("EditPage", () => {
+  it("keeps all major categories collapsed by default", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <StoreProvider>
+          <SeededEditPage />
+        </StoreProvider>,
+      );
+    });
+
+    const assetsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Assets"));
+    expect(assetsButton).toBeTruthy();
+    expect(assetsButton?.getAttribute("aria-expanded")).toBe("false");
+
+    const creditCardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Credit Cards"));
+    expect(creditCardButton).toBeTruthy();
+    expect(creditCardButton?.getAttribute("aria-expanded")).toBe("false");
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it("uses a date input for liability due dates", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

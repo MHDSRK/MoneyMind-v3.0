@@ -3,6 +3,7 @@ import {
   calculateMetrics,
   FinancialMetrics,
   getAccountBalanceHistory,
+  getUpcomingDues,
   getUpcomingCreditCardDues,
   getLiabilityScopeSummary,
   getLiabilityGroupTotals,
@@ -349,6 +350,161 @@ describe("Financial Calculations", () => {
       expect(dues).toHaveLength(1);
       expect(dues[0].id).toBe("cc1");
       expect(dues[0].daysLeft).toBe(3);
+    });
+
+    it("returns all supported upcoming due items ordered by nearest due date", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "cc1",
+            name: "Card A",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 10000,
+            outstanding: 1200,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-03T00:00:00.000Z",
+            deleted: false,
+          },
+        ],
+        loans: [
+          {
+            id: "loan1",
+            name: "Home Loan",
+            lender: "Bank A",
+            principal: 100000,
+            interestRate: 7.5,
+            emi: 0,
+            emiAmount: 5000,
+            emiCount: 0,
+            paidCount: 0,
+            emiFrequency: "monthly",
+            outstanding: 80000,
+            remainingMonths: 20,
+            startDate: "2025-01-01",
+            nextEmiDate: "2026-02-02T00:00:00.000Z",
+            deleted: false,
+          },
+        ],
+        liabilities: [
+          {
+            id: "liab1",
+            group: "Regular Expenses",
+            name: "House Rent",
+            amount: 20000,
+            dueDate: "2026-02-01",
+            deleted: false,
+          },
+        ],
+      });
+
+      const dues = getUpcomingDues(store, {
+        referenceDate: new Date("2026-01-30T00:00:00.000Z"),
+        daysAhead: 5,
+      });
+
+      expect(dues).toHaveLength(3);
+      expect(dues[0].entityType).toBe("liability");
+      expect(dues[0].name).toBe("House Rent");
+      expect(dues[1].entityType).toBe("loan");
+      expect(dues[1].name).toBe("Home Loan");
+      expect(dues[2].entityType).toBe("credit-card");
+      expect(dues[2].name).toBe("Card A");
+    });
+
+    it("excludes archived and deleted due items from the unified upcoming dues list", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "cc1",
+            name: "Card A",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 10000,
+            outstanding: 1200,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "2026-02-03T00:00:00.000Z",
+            deleted: true,
+          },
+        ],
+        loans: [
+          {
+            id: "loan1",
+            name: "Home Loan",
+            lender: "Bank A",
+            principal: 100000,
+            interestRate: 7.5,
+            emi: 0,
+            emiAmount: 5000,
+            emiCount: 0,
+            paidCount: 0,
+            emiFrequency: "monthly",
+            outstanding: 80000,
+            remainingMonths: 20,
+            startDate: "2025-01-01",
+            nextEmiDate: "2026-02-02T00:00:00.000Z",
+            archivedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        liabilities: [
+          {
+            id: "liab1",
+            group: "Regular Expenses",
+            name: "House Rent",
+            amount: 20000,
+            dueDate: "2026-02-01",
+            archivedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      });
+
+      const dues = getUpcomingDues(store, {
+        referenceDate: new Date("2026-01-30T00:00:00.000Z"),
+        daysAhead: 5,
+      });
+
+      expect(dues).toHaveLength(0);
+    });
+
+    it("ignores records without a valid due date", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "cc1",
+            name: "Card A",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 10000,
+            outstanding: 1200,
+            unbilled: 0,
+            statementDate: 1,
+            dueDate: 15,
+            nextDueDate: "invalid-date",
+            deleted: false,
+          },
+        ],
+        liabilities: [
+          {
+            id: "liab1",
+            group: "Regular Expenses",
+            name: "House Rent",
+            amount: 20000,
+            dueDate: "",
+            deleted: false,
+          },
+        ],
+      });
+
+      const dues = getUpcomingDues(store, {
+        referenceDate: new Date("2026-01-30T00:00:00.000Z"),
+        daysAhead: 5,
+      });
+
+      expect(dues).toHaveLength(0);
     });
 
     it("uses the selected liability item amount as the scoped summary", () => {

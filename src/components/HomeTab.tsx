@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useStore, Transaction, TransactionType } from "@/hooks/useStore";
-import { calculateMetrics, getUpcomingCreditCardDues } from "@/lib/calculations";
+import { calculateMetrics, getUpcomingDues } from "@/lib/calculations";
 import { createTransaction } from "@/lib/transactionEffects";
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -32,7 +32,7 @@ export function HomeTab() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayNet = financialMetrics.todayIncome - financialMetrics.todayExpense;
 
-  const upcomingDues = getUpcomingCreditCardDues(store);
+  const upcomingDues = getUpcomingDues(store);
 
   const handleSave = () => {
     if (!amount || !ledger || !category || !txType) return;
@@ -229,27 +229,27 @@ export function HomeTab() {
           </div>
         ) : (
           <div className="divide-y divide-white/5">
-            {upcomingDues.map((cc) => (
-              <div key={cc.id} className="flex items-center px-4 py-3">
+            {upcomingDues.map((due) => (
+              <div key={due.id} className="flex items-center px-4 py-3">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{cc.name}</p>
+                  <p className="font-medium text-sm truncate">{due.name}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {cc.daysLeft === 0
+                    {due.daysLeft === 0
                       ? "Due today"
-                      : cc.daysLeft === 1
+                      : due.daysLeft === 1
                       ? "Tomorrow"
-                      : `In ${cc.daysLeft} days`}
+                      : `In ${due.daysLeft} days`}
                     {" · "}
-                    {formatAppDate(cc.nextDueDate)}
+                    {formatAppDate(due.nextDueDate)}
                   </p>
                 </div>
                 <span
                   className={cn(
                     "font-bold text-sm shrink-0",
-                    cc.daysLeft === 0 ? "text-destructive" : "text-orange-400"
+                    due.daysLeft === 0 ? "text-destructive" : "text-orange-400"
                   )}
                 >
-                  {formatCurrency(cc.outstanding)}
+                  {formatCurrency(due.dueAmount)}
                 </span>
               </div>
             ))}

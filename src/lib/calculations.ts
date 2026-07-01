@@ -52,11 +52,11 @@ function isTrackingLabel(value?: string): boolean {
   return /\blent\b/.test(normalizedValue) || normalizedValue === "tracking" || normalizedValue === "tracking-only";
 }
 
-export function isTrackingAccount(account: { name?: string }): boolean {
-  return isTrackingLabel(account.name);
+export function isTrackingAccount(account: { name?: string; isTracking?: boolean }): boolean {
+  return Boolean(account.isTracking) || isTrackingLabel(account.name);
 }
 
-export function isLentAccount(account: { name?: string }): boolean {
+export function isLentAccount(account: { name?: string; isTracking?: boolean }): boolean {
   return isTrackingAccount(account);
 }
 
@@ -77,12 +77,129 @@ export function isTrackingTransaction(transaction: Transaction): boolean {
   return candidates.some((value) => isTrackingLabel(value));
 }
 
+export function getActiveFinancialAccounts(store: Store) {
+  return store.accounts.filter(isFinancialAccount);
+}
+
+export function getActiveLendRecords(store: Store) {
+  return store.lends.filter((lend) => !lend.deleted && !lend.archivedAt);
+}
+
 export interface UpcomingCreditCardDue {
   id: string;
   name: string;
   outstanding: number;
   nextDueDate: string;
   daysLeft: number;
+}
+
+export interface UpcomingDueItem {
+  id: string;
+  entityId: string;
+  entityType: "credit-card" | "loan" | "liability";
+  name: string;
+  group?: string;
+  dueAmount: number;
+  nextDueDate: string;
+  daysLeft: number;
+}
+
+function parseDueDate(dateValue?: string): Date | null {
+  if (!dateValue) return null;
+  const dueDate = new Date(dateValue);
+  if (Number.isNaN(dueDate.getTime())) return null;
+  dueDate.setHours(0, 0, 0, 0);
+  return dueDate;
+}
+
+export function getUpcomingDues(
+  store: Store,
+  options: { referenceDate?: Date; daysAhead?: number } = {}
+): UpcomingDueItem[] {
+  const referenceDate = new Date(options.referenceDate ?? new Date());
+  referenceDate.setHours(0, 0, 0, 0);
+  const daysAhead = options.daysAhead ?? 5;
+
+  const dues: UpcomingDueItem[] = [];
+
+  function isUpcomingDueItem(item: UpcomingDueItem | null): item is UpcomingDueItem {
+    return item !== null;
+  }
+
+  dues.push(
+    ...store.creditCards
+      .filter((card) => !card.deleted && !card.archivedAt && card.outstanding > 0)
+      .map<UpcomingDueItem | null>((card) => {
+        const dueDate = parseDueDate(card.nextDueDate);
+        if (!dueDate) return null;
+
+        const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
+        if (daysLeft < 0 || daysLeft > daysAhead) return null;
+
+        return {
+          id: `credit-card-${card.id}`,
+          entityId: card.id,
+          entityType: "credit-card",
+          name: card.name,
+          dueAmount: card.outstanding,
+          nextDueDate: card.nextDueDate,
+          daysLeft,
+        };
+      })
+      .filter(isUpcomingDueItem)
+  );
+
+  dues.push(
+    ...store.loans
+      .filter((loan) => !loan.deleted && !loan.archivedAt && loan.outstanding > 0)
+      .map<UpcomingDueItem | null>((loan) => {
+        const dueDate = parseDueDate(loan.nextEmiDate);
+        if (!dueDate) return null;
+
+        const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
+        if (daysLeft < 0 || daysLeft > daysAhead) return null;
+
+        return {
+          id: `loan-${loan.id}`,
+          entityId: loan.id,
+          entityType: "loan",
+          name: loan.name,
+          dueAmount: loan.emiAmount > 0 ? loan.emiAmount : loan.outstanding,
+          nextDueDate: loan.nextEmiDate,
+          daysLeft,
+        };
+      })
+      .filter(isUpcomingDueItem)
+  );
+
+  dues.push(
+    ...store.liabilities
+      .filter((item) => !item.deleted && !item.archivedAt)
+      .map<UpcomingDueItem | null>((item) => {
+        const dueDate = parseDueDate(item.dueDate);
+        if (!dueDate) return null;
+
+        const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
+        if (daysLeft < 0 || daysLeft > daysAhead) return null;
+
+        return {
+          id: `liability-${item.id}`,
+          entityId: item.id,
+          entityType: "liability",
+          name: item.name,
+          group: item.group,
+          dueAmount: item.amount,
+          nextDueDate: item.dueDate,
+          daysLeft,
+        };
+      })
+      .filter(isUpcomingDueItem)
+  );
+
+  return dues.sort((a, b) => {
+    if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 export interface LiabilityScopeSummary {
@@ -96,34 +213,15 @@ export function getUpcomingCreditCardDues(
   store: Store,
   options: { referenceDate?: Date; daysAhead?: number } = {}
 ): UpcomingCreditCardDue[] {
-  const referenceDate = new Date(options.referenceDate ?? new Date());
-  referenceDate.setHours(0, 0, 0, 0);
-  const daysAhead = options.daysAhead ?? 5;
-
-  return store.creditCards
-    .filter((card) => !card.deleted && !card.archivedAt && card.outstanding > 0)
-    .map((card) => {
-      if (!card.nextDueDate) return null;
-
-      const dueDate = new Date(card.nextDueDate);
-      if (Number.isNaN(dueDate.getTime())) return null;
-
-      const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
-      if (daysLeft < 0 || daysLeft > daysAhead) return null;
-
-      return {
-        id: card.id,
-        name: card.name,
-        outstanding: card.outstanding,
-        nextDueDate: card.nextDueDate,
-        daysLeft,
-      };
-    })
-    .filter((item): item is UpcomingCreditCardDue => Boolean(item))
-    .sort((a, b) => {
-      if (a.daysLeft !== b.daysLeft) return a.daysLeft - b.daysLeft;
-      return a.name.localeCompare(b.name);
-    });
+  return getUpcomingDues(store, options)
+    .filter((due) => due.entityType === "credit-card")
+    .map((card) => ({
+      id: card.entityId,
+      name: card.name,
+      outstanding: card.dueAmount,
+      nextDueDate: card.nextDueDate,
+      daysLeft: card.daysLeft,
+    }));
 }
 
 export function getLiabilityGroupTotals(store: Store): Record<string, number> {
@@ -181,10 +279,14 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // ─────────────────────────────────────────────────────────────────────────────
   // Account Balances by Type
   // ─────────────────────────────────────────────────────────────────────────────
-  const activeFinancialAccounts = store.accounts.filter(isFinancialAccount);
+  const activeFinancialAccounts = getActiveFinancialAccounts(store);
   const activeCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
   const activeLoans = store.loans.filter((l) => !l.deleted && !l.archivedAt);
   const activeLiabilities = store.liabilities.filter((item) => !item.deleted && !item.archivedAt);
+
+  // Tracking-only lent records are stored separately and never participate in asset,
+  // net worth, available balance, dashboard summaries, or reports.
+  const activeLendRecords = getActiveLendRecords(store);
 
   const cashBalance = activeFinancialAccounts
     .filter((a) => a.type === "cash")

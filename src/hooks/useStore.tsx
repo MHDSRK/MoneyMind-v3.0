@@ -52,6 +52,7 @@ export interface Account {
   deleted?: boolean;
   archivedAt?: string;
   isArchived?: boolean;
+  isTracking?: boolean;
   createdAt?: string;
   updatedAt?: string;
   notes?: string;
@@ -900,9 +901,11 @@ function normalizeAccount(account: Partial<Account>): Account {
     type: normalizedType,
     group: account.group,
     balance: account.balance ?? 0,
+    notes: account.notes ?? "",
     deleted: account.deleted ?? false,
     archivedAt: account.archivedAt,
     isArchived: account.isArchived ?? false,
+    isTracking: account.isTracking ?? false,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   });

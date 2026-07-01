@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { useStore, Loan, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
+import { getRemainingEmis } from "@/lib/calculations";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
@@ -76,7 +77,7 @@ export function LoansTab() {
           <div className="px-4 py-4 text-sm text-muted-foreground">No active loans yet. Add one to begin.</div>
         ) : (
           visibleLoans.map((loan) => {
-            const remainingMonths = Math.max(0, loan.remainingMonths ?? 0);
+            const remainingMonths = Math.max(0, getRemainingEmis(store, loan.id));
             const subtitle = loan.tag ? `${loan.tag}${loan.lender ? ` • ${loan.lender}` : ""}` : loan.lender || "Loan";
 
             return (

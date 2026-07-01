@@ -215,8 +215,8 @@ export function TodayTab() {
         ) : (
           <div className="divide-y divide-white/5">
             {todaysTx.map((tx) => (
-              <div key={tx.id} className="flex items-center px-4 py-3 gap-2">
-                <div className="flex-1 flex flex-col min-w-0 pr-2">
+              <div key={tx.id} className="flex items-center px-3 py-3 gap-1">
+                <div className="flex-1 flex flex-col min-w-0 pr-1">
                   <p className="truncate text-sm font-semibold text-white">
                     {tx.type === "transfer"
                       ? `Self Transfer : ${formatCurrency(tx.amount)}`
@@ -245,11 +245,11 @@ export function TodayTab() {
                   {tx.type === "out" ? formatCurrency(tx.amount) : "₹0.00"}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleEditTransaction(tx)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-primary transition hover:bg-white/10 hover:text-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/5 text-primary transition hover:bg-white/10 hover:text-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                     aria-label="Edit transaction"
                   >
                     <Pencil className="h-4 w-4" />
@@ -257,7 +257,7 @@ export function TodayTab() {
                   <button
                     type="button"
                     onClick={() => handleDeleteTransaction(tx)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-transparent text-destructive transition hover:bg-destructive/10 hover:text-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-destructive transition hover:bg-destructive/10 hover:text-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30"
                     aria-label="Delete transaction"
                   >
                     <Trash2 className="h-4 w-4" />

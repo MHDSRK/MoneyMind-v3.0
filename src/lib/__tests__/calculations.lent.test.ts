@@ -65,6 +65,36 @@ describe("Lent tracking exclusion", () => {
     expect(metricsBefore.netWorth).toBe(metricsAfter.netWorth);
   });
 
+  it("excludes bank accounts labeled Lent from asset totals and net worth", () => {
+    const store = createStore({
+      accounts: [
+        { id: "acct-1", name: "Bank", type: "bank", balance: 1000, deleted: false },
+        { id: "acct-2", name: "Lent to Ravi", type: "bank", balance: 500, deleted: false },
+      ],
+    });
+
+    const metrics = calculateMetrics(store);
+
+    expect(metrics.totalAssets).toBe(1000);
+    expect(metrics.netWorth).toBe(1000);
+  });
+
+  it("does not include active store.lends records in shared financial totals", () => {
+    const store = createStore({
+      accounts: [
+        { id: "acct-1", name: "Bank", type: "bank", balance: 1000, deleted: false },
+      ],
+      lends: [
+        { id: "lend-1", name: "Lent to Ravi", amount: 500, date: "2026-06-15", deleted: false },
+      ],
+    });
+
+    const metrics = calculateMetrics(store);
+
+    expect(metrics.totalAssets).toBe(1000);
+    expect(metrics.netWorth).toBe(1000);
+  });
+
   it("excludes archived Lent accounts from all financial calculations", () => {
     const store = createStore({
       accounts: [

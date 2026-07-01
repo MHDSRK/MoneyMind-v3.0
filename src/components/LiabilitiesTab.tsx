@@ -17,13 +17,17 @@ const GROUPS = ["Regular Expenses", "Chitty", "Borrow", "More Liabilities"];
 export function LiabilitiesTab() {
   const { store, updateStore } = useStore();
   const [location] = useLocation();
-  const [selectedLiability, setSelectedLiability] = useState<LiabilityItem | null>(null);
+  const [selectedLiabilityId, setSelectedLiabilityId] = useState<string | null>(null);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [liabilityPendingArchive, setLiabilityPendingArchive] = useState<LiabilityItem | null>(null);
   const [paymentSheetItemId, setPaymentSheetItemId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [showArchivedExpenses, setShowArchivedExpenses] = useState(false);
   const liabilityRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const selectedLiability = selectedLiabilityId
+    ? store.liabilities.find((item) => item.id === selectedLiabilityId) ?? null
+    : null;
 
   const visibleLiabilities = store.liabilities.filter((item) => !item.deleted && !item.archivedAt);
   const groupedLiabilities = visibleLiabilities.reduce((acc, item) => {
@@ -38,7 +42,7 @@ export function LiabilitiesTab() {
   const archivedRegularExpenses = store.liabilities
     .filter((item) => item.group === "Regular Expenses" && !item.deleted && Boolean(item.archivedAt))
     .sort((a, b) => new Date(b.archivedAt ?? 0).getTime() - new Date(a.archivedAt ?? 0).getTime());
-  const [expandedGroup, setExpandedGroup] = useState<string | undefined>(GROUPS[0]);
+  const [expandedGroup, setExpandedGroup] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!location.startsWith("/others")) return;
@@ -120,7 +124,7 @@ export function LiabilitiesTab() {
                     name={item.name}
                     subtitle={item.dueDate ? `Due • ${formatAppDate(item.dueDate)}` : `Group • ${item.group}`}
                     amount={item.amount}
-                    onClick={() => setSelectedLiability(item)}
+                    onClick={() => setSelectedLiabilityId(item.id)}
                     onArchive={() => promptArchiveLiability(item)}
                   />
                     </div>
@@ -207,12 +211,12 @@ export function LiabilitiesTab() {
                   key: "close",
                   label: "Close",
                   variant: "primary",
-                  onClick: () => setSelectedLiability(null),
+                  onClick: () => setSelectedLiabilityId(null),
                 },
               ]
-            : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedLiability(null) }]
+            : [{ key: "close", label: "Close", variant: "primary", onClick: () => setSelectedLiabilityId(null) }]
         }
-        onClose={() => setSelectedLiability(null)}
+        onClose={() => setSelectedLiabilityId(null)}
       />
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={(open) => !open && cancelArchiveLiability()}>

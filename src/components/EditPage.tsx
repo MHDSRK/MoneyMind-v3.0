@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore, Account, CreditCard, Loan, LiabilityItem, updateAccount, updateCreditCard, updateLoan, updateLiability } from "@/hooks/useStore";
 import { EditAccordion } from "@/components/EditAccordion";
 import { EditableField } from "@/components/EditableField";
 import { EditDialog } from "@/components/EditDialog";
 import { formatCurrency } from "@/lib/utils";
+import { isTrackingAccount } from "@/lib/calculations";
 import { toast } from "@/hooks/use-toast";
 import { formatDisplayDate } from "@/utils/date";
 
@@ -27,16 +28,16 @@ function groupRecords(store: ReturnType<typeof useStore>['store'], query: string
   const filterName = (name: string) => !normalized || name.toLowerCase().includes(normalized);
 
   const assets = store.accounts.filter(
-    (item) => !item.deleted && !item.archivedAt && ['cash', 'bank', 'business'].includes(item.type ?? '') && filterName(item.name)
+    (item) => !item.deleted && !item.archivedAt && ['cash', 'bank', 'business'].includes(item.type ?? '') && !isTrackingAccount(item) && filterName(item.name)
   );
   const investments = store.accounts.filter(
-    (item) => !item.deleted && !item.archivedAt && item.type === 'investments' && filterName(item.name)
+    (item) => !item.deleted && !item.archivedAt && item.type === 'investments' && !isTrackingAccount(item) && filterName(item.name)
   );
   const insurance = store.accounts.filter(
-    (item) => !item.deleted && !item.archivedAt && item.type === 'insurance' && filterName(item.name)
+    (item) => !item.deleted && !item.archivedAt && item.type === 'insurance' && !isTrackingAccount(item) && filterName(item.name)
   );
   const lent = store.accounts.filter(
-    (item) => !item.deleted && !item.archivedAt && item.type === 'other' && filterName(item.name)
+    (item) => !item.deleted && !item.archivedAt && isTrackingAccount(item) && filterName(item.name)
   );
   const creditCards = store.creditCards.filter(
     (item) => !item.deleted && !item.archivedAt && filterName(item.name)
@@ -50,13 +51,20 @@ function groupRecords(store: ReturnType<typeof useStore>['store'], query: string
   const borrowed = store.liabilities.filter(
     (item) => !item.deleted && !item.archivedAt && item.group === 'Borrow' && filterName(item.name)
   );
+  const chitty = store.liabilities.filter(
+    (item) => !item.deleted && !item.archivedAt && item.group === 'Chitty' && filterName(item.name)
+  );
+  const moreLiabilities = store.liabilities.filter(
+    (item) => !item.deleted && !item.archivedAt && item.group === 'More Liabilities' && filterName(item.name)
+  );
 
-  return { assets, investments, insurance, lent, creditCards, loans, regularExpenses, borrowed };
+  return { assets, investments, insurance, lent, creditCards, loans, regularExpenses, borrowed, chitty, moreLiabilities };
 }
 
 export function EditPage() {
   const { store, updateStore } = useStore();
   const [query, setQuery] = useState("");
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogConfig>({ open: false });
 
@@ -80,6 +88,50 @@ export function EditPage() {
     }));
 
     toast({ title: "Account added", description: "A new account was added." });
+  };
+
+  const createLentAccount = () => {
+    const existingPlaceholders = store.accounts.filter(
+      (account) =>
+        account.isTracking &&
+        account.name?.startsWith("New Lent Account") &&
+        account.balance === 0 &&
+        !account.deleted &&
+        !account.archivedAt,
+    );
+
+    if (existingPlaceholders.length > 0) {
+      setExpandedCategory("lent");
+      toast({ title: "Finish the existing Lent item", description: "Edit the current Lent account before adding another." });
+      return;
+    }
+
+    const placeholderIndex = store.accounts.reduce((count, account) => {
+      return account.name?.startsWith("New Lent Account") ? count + 1 : count;
+    }, 0) + 1;
+
+    const placeholderName = placeholderIndex === 1 ? "New Lent Account" : `New Lent Account ${placeholderIndex}`;
+
+    updateStore((prev) => ({
+      ...prev,
+      accounts: [
+        ...prev.accounts,
+        {
+          id: crypto.randomUUID(),
+          name: placeholderName,
+          type: "other",
+          group: "accounts",
+          balance: 0,
+          deleted: false,
+          isTracking: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    }));
+
+    setExpandedCategory("lent");
+    toast({ title: "Lent item added", description: "A new Lent tracking account was added." });
   };
 
   const createCreditCard = () => {
@@ -379,9 +431,12 @@ export function EditPage() {
       ) : null}
 
       <div className="space-y-6">
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Assets</p>
+        <EditAccordion
+          label="Assets"
+          isOpen={expandedCategory === "assets"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "assets" ? null : "assets"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => createAccount("cash")}
@@ -389,19 +444,20 @@ export function EditPage() {
             >
               Add Asset
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.assets.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No assets found.</div>
             ) : (
               groups.assets.map((item) => renderRecord({ type: 'account', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Investments</p>
+        <EditAccordion
+          label="Investments"
+          isOpen={expandedCategory === "investments"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "investments" ? null : "investments"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => createAccount("investments")}
@@ -409,19 +465,20 @@ export function EditPage() {
             >
               Add Investment
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.investments.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No investments found.</div>
             ) : (
               groups.investments.map((item) => renderRecord({ type: 'account', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Insurance</p>
+        <EditAccordion
+          label="Insurance"
+          isOpen={expandedCategory === "insurance"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "insurance" ? null : "insurance"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => createAccount("insurance")}
@@ -429,39 +486,41 @@ export function EditPage() {
             >
               Add Insurance
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.insurance.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No insurance accounts found.</div>
             ) : (
               groups.insurance.map((item) => renderRecord({ type: 'account', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Lent</p>
+        <EditAccordion
+          label="Lent"
+          isOpen={expandedCategory === "lent"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "lent" ? null : "lent"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
-              onClick={() => createAccount("other")}
+              onClick={createLentAccount}
               className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-white/10"
             >
               Add Lent Item
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.lent.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No lent accounts found.</div>
             ) : (
               groups.lent.map((item) => renderRecord({ type: 'account', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Credit Cards</p>
+        <EditAccordion
+          label="Credit Cards"
+          isOpen={expandedCategory === "creditCards"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "creditCards" ? null : "creditCards"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={createCreditCard}
@@ -469,19 +528,20 @@ export function EditPage() {
             >
               Add Card
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.creditCards.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No credit cards found.</div>
             ) : (
               groups.creditCards.map((item) => renderRecord({ type: 'credit-card', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Loans</p>
+        <EditAccordion
+          label="Loans"
+          isOpen={expandedCategory === "loans"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "loans" ? null : "loans"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={createLoan}
@@ -489,19 +549,20 @@ export function EditPage() {
             >
               Add Loan
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.loans.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No loans found.</div>
             ) : (
               groups.loans.map((item) => renderRecord({ type: 'loan', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Regular Expenses</p>
+        <EditAccordion
+          label="Regular Expenses"
+          isOpen={expandedCategory === "regularExpenses"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "regularExpenses" ? null : "regularExpenses"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => createLiability("Regular Expenses")}
@@ -509,19 +570,20 @@ export function EditPage() {
             >
               Add Expense
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.regularExpenses.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No regular expenses found.</div>
             ) : (
               groups.regularExpenses.map((item) => renderRecord({ type: 'liability', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Borrowed</p>
+        <EditAccordion
+          label="Borrow"
+          isOpen={expandedCategory === "borrowed"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "borrowed" ? null : "borrowed"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
             <button
               type="button"
               onClick={() => createLiability("Borrow")}
@@ -529,15 +591,41 @@ export function EditPage() {
             >
               Add Borrowed Item
             </button>
-          </div>
-          <div className="space-y-2">
             {groups.borrowed.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No borrowed items found.</div>
             ) : (
               groups.borrowed.map((item) => renderRecord({ type: 'liability', item }))
             )}
           </div>
-        </div>
+        </EditAccordion>
+
+        <EditAccordion
+          label="Chitty"
+          isOpen={expandedCategory === "chitty"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "chitty" ? null : "chitty"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
+            {groups.chitty.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No chitty items found.</div>
+            ) : (
+              groups.chitty.map((item) => renderRecord({ type: 'liability', item }))
+            )}
+          </div>
+        </EditAccordion>
+
+        <EditAccordion
+          label="More Liabilities"
+          isOpen={expandedCategory === "moreLiabilities"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "moreLiabilities" ? null : "moreLiabilities"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
+            {groups.moreLiabilities.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No more liabilities found.</div>
+            ) : (
+              groups.moreLiabilities.map((item) => renderRecord({ type: 'liability', item }))
+            )}
+          </div>
+        </EditAccordion>
       </div>
 
       <EditDialog
