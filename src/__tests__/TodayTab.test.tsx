@@ -50,7 +50,7 @@ describe("TodayTab", () => {
     window.localStorage.clear();
   });
 
-  it("renders icon-only edit and delete actions for today's cash flow rows", () => {
+  it("renders a compact transaction row without permanent edit or delete buttons", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -63,15 +63,15 @@ describe("TodayTab", () => {
       );
     });
 
+    const rowButton = container.querySelector("button[type='button']");
     const editButton = container.querySelector("button[aria-label='Edit transaction']");
     const deleteButton = container.querySelector("button[aria-label='Delete transaction']");
 
-    expect(editButton).not.toBeNull();
-    expect(deleteButton).not.toBeNull();
-    expect(editButton?.querySelector("svg")).not.toBeNull();
-    expect(deleteButton?.querySelector("svg")).not.toBeNull();
-    expect(container.textContent).not.toContain("Edit\n");
-    expect(container.textContent).not.toContain("Edit ");
+    expect(rowButton).not.toBeNull();
+    expect(editButton).toBeNull();
+    expect(deleteButton).toBeNull();
+    expect(container.textContent).toContain("Monthly Salary Payment");
+    expect(container.textContent).toContain("Bank Account");
 
     act(() => {
       root.unmount();

@@ -8,6 +8,8 @@ interface SwipeableArchiveCardProps {
   actionClassName?: string;
   revealWidth?: number;
   actionLabel?: string;
+  isOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 export function SwipeableArchiveCard({
@@ -17,6 +19,8 @@ export function SwipeableArchiveCard({
   actionClassName,
   revealWidth = 80,
   actionLabel = "Archive",
+  isOpen,
+  onOpenChange,
 }: SwipeableArchiveCardProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const startXRef = useRef(0);
@@ -24,14 +28,20 @@ export function SwipeableArchiveCard({
   const currentOffsetRef = useRef(0);
   const [offset, setOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof isOpen === "boolean") {
+      setInternalIsOpen(isOpen);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isDragging) {
-      setOffset(isOpen ? -revealWidth : 0);
-      currentOffsetRef.current = isOpen ? -revealWidth : 0;
+      setOffset(internalIsOpen ? -revealWidth : 0);
+      currentOffsetRef.current = internalIsOpen ? -revealWidth : 0;
     }
-  }, [isDragging, isOpen, revealWidth]);
+  }, [isDragging, internalIsOpen, revealWidth]);
 
   const isInteractiveTarget = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;
@@ -62,7 +72,8 @@ export function SwipeableArchiveCard({
   const finalizeSwipe = () => {
     const threshold = revealWidth / 2;
     const shouldOpen = offset <= -threshold;
-    setIsOpen(shouldOpen);
+    setInternalIsOpen(shouldOpen);
+    onOpenChange?.(shouldOpen);
     setOffset(shouldOpen ? -revealWidth : 0);
     currentOffsetRef.current = shouldOpen ? -revealWidth : 0;
     setIsDragging(false);
@@ -83,7 +94,8 @@ export function SwipeableArchiveCard({
 
   const handleAction = () => {
     onArchive();
-    setIsOpen(false);
+    setInternalIsOpen(false);
+    onOpenChange?.(false);
   };
 
   return (

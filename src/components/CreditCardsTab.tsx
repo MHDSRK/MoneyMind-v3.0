@@ -116,7 +116,7 @@ export function CreditCardsTab() {
         </div>
       </div>
 
-      <div className="space-y-3 overflow-hidden rounded-none bg-transparent">
+      <div className="space-y-4 overflow-hidden rounded-none bg-transparent">
         {visibleCards.length === 0 ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">No active credit cards yet. Add one to begin.</div>
         ) : (
@@ -135,62 +135,66 @@ export function CreditCardsTab() {
                     <p className="text-sm font-semibold text-foreground truncate">{card.name}</p>
                     <p className="mt-1 text-xs text-muted-foreground truncate">{card.provider || card.cardType || "Credit card"}</p>
                   </div>
-                  <div className="text-right min-w-[120px]">
-                    <p className="text-sm font-semibold text-muted-foreground">{formatCurrency(card.creditLimit)}</p>
-                    <p className="mt-2 text-xl font-semibold text-sky-400">{formatCurrency(cardAvailable(card))}</p>
+                  <div className="min-w-[160px] grid gap-2 text-right">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Limit</p>
+                      <p className="mt-1 text-sm font-semibold text-muted-foreground">{formatCurrency(card.creditLimit)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Available</p>
+                      <p className="mt-1 text-sm font-semibold text-sky-400">{formatCurrency(cardAvailable(card))}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-3 gap-2.5">
-                  <div className="rounded-2xl bg-white/5 p-2.5">
+                <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-2xl bg-white/5 p-3 text-center">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">DUE</p>
                     <p className="mt-2 text-sm font-semibold text-destructive">{formatCurrency(cardDueAmount(card))}</p>
                   </div>
-                  <div className="rounded-2xl bg-white/5 p-2.5">
+                  <div className="rounded-2xl bg-white/5 p-3 text-center">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Due Date</p>
                     <p className="mt-2 text-sm font-semibold text-foreground">{formatDueDate(card.nextDueDate)}</p>
                   </div>
-                  <div className="rounded-2xl bg-white/5 p-2.5">
+                  <div className="rounded-2xl bg-white/5 p-3 text-center">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Unbilled</p>
                     <p className="mt-2 text-sm font-semibold text-amber-400">{formatCurrency(card.unbilled ?? 0)}</p>
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
-                  <div className="flex items-center gap-2 rounded-2xl bg-white/5 px-3 py-2">
-                    <span className="text-sm text-muted-foreground">₹</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      value={quickAddCardId === card.id ? quickAddAmount : ""}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openQuickAdd(card.id);
-                      }}
-                      onChange={(event) => {
-                        event.stopPropagation();
-                        openQuickAdd(card.id);
-                        setQuickAddAmount(event.target.value);
-                      }}
-                      placeholder="Amount"
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 bg-transparent px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (quickAddCardId !== card.id) {
+                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+                  <div className="rounded-2xl bg-white/5 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">₹</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={quickAddCardId === card.id ? quickAddAmount : ""}
+                        onFocus={(event) => {
+                          event.stopPropagation();
                           openQuickAdd(card.id);
-                          return;
-                        }
-                        confirmQuickAdd();
-                      }}
-                      className="rounded-xl bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-                    >
-                      +
-                    </button>
+                        }}
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          openQuickAdd(card.id);
+                          setQuickAddAmount(event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            if (quickAddCardId !== card.id) {
+                              openQuickAdd(card.id);
+                              return;
+                            }
+                            confirmQuickAdd();
+                          }
+                        }}
+                        placeholder="Amount"
+                        className="min-w-0 w-full rounded-xl border border-white/10 bg-transparent px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                      />
+                    </div>
                   </div>
                   <div className="rounded-2xl bg-white/5 px-3 py-2 text-right min-w-0">
                     <div className="flex flex-col items-end gap-1">

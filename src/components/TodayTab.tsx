@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { useStore, Transaction, deleteTransactionFromStore, restoreTransactionFromStore, updateTransactionInStore } from "@/hooks/useStore";
+import { useStore, Transaction, deleteTransactionFromStore, updateTransactionInStore } from "@/hooks/useStore";
 import { createTransaction } from "@/lib/transactionEffects";
 import { isTrackingTransaction } from "@/lib/calculations";
 import { toast } from "@/hooks/use-toast";
 import { formatAppDate } from "@/utils/date";
-import { ToastAction } from "@/components/ui/toast";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -17,7 +16,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeftRight, ArrowDownToLine, ArrowUpFromLine, Trash2, Pencil } from "lucide-react";
+import { SwipeableArchiveCard } from "@/components/SwipeableArchiveCard";
+import { ArrowLeftRight, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 
 type TransactionMode = "in" | "out" | "self";
 
@@ -27,6 +27,7 @@ export function TodayTab() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   const [txType, setTxType] = useState<TransactionMode | null>(null);
   const [amount, setAmount] = useState("");
   const [ledger, setLedger] = useState("");
@@ -94,6 +95,31 @@ export function TodayTab() {
     setSheetOpen(true);
   };
 
+  const handleEditTransaction = (transaction: Transaction) => {
+    setOpenSwipeId(null);
+    openTransactionEditor(transaction);
+  };
+
+  const handleDeleteTransaction = (transaction: Transaction) => {
+    setTransactionToDelete(transaction);
+    setDeleteDialogOpen(true);
+    setOpenSwipeId(null);
+  };
+
+  const confirmDeleteTransaction = () => {
+    if (!transactionToDelete) return;
+
+    updateStore((prev) => deleteTransactionFromStore(prev, transactionToDelete));
+    toast({ title: "Transaction deleted", description: "The transaction was removed successfully." });
+    setTransactionToDelete(null);
+    setDeleteDialogOpen(false);
+  };
+
+  const cancelDeleteTransaction = () => {
+    setTransactionToDelete(null);
+    setDeleteDialogOpen(false);
+  };
+
   const handleSaveTransaction = () => {
     if (!amount || !ledger || !category || !txType) return;
 
@@ -156,42 +182,7 @@ export function TodayTab() {
     resetTransactionForm();
   };
 
-  const handleDeleteTransaction = (transaction: Transaction) => {
-    setTransactionToDelete(transaction);
-    setDeleteDialogOpen(true);
-  };
 
-  const confirmDeleteTransaction = () => {
-    if (!transactionToDelete) return;
-
-    updateStore((prev) => deleteTransactionFromStore(prev, transactionToDelete));
-    toast({
-      title: "Transaction deleted",
-      description: "The transaction was removed and its balance impact was reversed.",
-      action: (
-        <ToastAction
-          altText="Undo transaction deletion"
-          onClick={() => {
-            updateStore((prev) => restoreTransactionFromStore(prev, transactionToDelete));
-            toast({ title: "Transaction restored", description: "The transaction was restored successfully." });
-          }}
-        >
-          Undo
-        </ToastAction>
-      ),
-    });
-    setDeleteDialogOpen(false);
-    setTransactionToDelete(null);
-  };
-
-  const cancelDeleteTransaction = () => {
-    setDeleteDialogOpen(false);
-    setTransactionToDelete(null);
-  };
-
-  const handleEditTransaction = (transaction: Transaction) => {
-    openTransactionEditor(transaction);
-  };
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-6">
@@ -215,59 +206,59 @@ export function TodayTab() {
         ) : (
           <div className="divide-y divide-white/5">
             {todaysTx.map((tx) => (
-              <div key={tx.id} className="flex items-center px-3 py-3 gap-1">
-                <div className="flex-1 flex flex-col min-w-0 pr-1">
-                  <p className="truncate text-sm font-semibold text-white">
-                    {tx.type === "transfer"
-                      ? `Self Transfer : ${formatCurrency(tx.amount)}`
-                      : tx.ledger || tx.category || "Transaction"}
-                  </p>
+              <SwipeableArchiveCard
+                key={tx.id}
+                onArchive={() => handleDeleteTransaction(tx)}
+                actionLabel="Delete"
+                actionClassName="bg-destructive/95"
+                isOpen={openSwipeId === tx.id}
+                onOpenChange={(isOpen) => setOpenSwipeId(isOpen ? tx.id : null)}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleEditTransaction(tx)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleEditTransaction(tx);
+                    }
+                  }}
+                  className="flex items-center px-3 py-3 gap-3 w-full text-left hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex-1 min-w-[15ch] min-h-[3rem] flex flex-col justify-center">
+                    <p className="truncate text-sm font-semibold text-white">
+                      {tx.type === "transfer"
+                        ? `Self Transfer : ${formatCurrency(tx.amount)}`
+                        : tx.ledger || tx.category || "Transaction"}
+                    </p>
 
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {tx.type === "transfer"
-                      ? `From ${getAccountName(
-                          tx.fromAccountId,
-                          tx.fromAccount
-                        )} to ${getAccountName(tx.toAccountId, tx.toAccount)}`
-                      : tx.notes ||
-                        tx.account ||
-                        tx.fromAccount ||
-                        tx.toAccount ||
-                        ""}
-                  </p>
-                </div>
+                    <p className="mt-1 text-xs text-muted-foreground truncate">
+                      {tx.type === "transfer"
+                        ? `From ${getAccountName(
+                            tx.fromAccountId,
+                            tx.fromAccount
+                          )} to ${getAccountName(tx.toAccountId, tx.toAccount)}`
+                        : tx.notes ||
+                          tx.account ||
+                          tx.fromAccount ||
+                          tx.toAccount ||
+                          ""}
+                    </p>
+                  </div>
 
-                <div className="w-24 text-right text-emerald-400 font-medium text-sm">
-                  {tx.type === "in" ? formatCurrency(tx.amount) : "₹0.00"}
+                  <div className="w-24 text-right text-sm font-semibold">
+                    <span className={cn(
+                      tx.type === "in" ? "text-emerald-400" : tx.type === "out" ? "text-destructive" : "text-foreground",
+                    )}>
+                      {tx.type === "in" ? formatCurrency(tx.amount) : tx.type === "out" ? formatCurrency(tx.amount) : formatCurrency(0)}
+                    </span>
+                  </div>
                 </div>
-
-                <div className="w-24 text-right text-red-400 font-medium text-sm">
-                  {tx.type === "out" ? formatCurrency(tx.amount) : "₹0.00"}
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleEditTransaction(tx)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/5 text-primary transition hover:bg-white/10 hover:text-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                    aria-label="Edit transaction"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteTransaction(tx)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-destructive transition hover:bg-destructive/10 hover:text-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30"
-                    aria-label="Delete transaction"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+              </SwipeableArchiveCard>
             ))}
           </div>
         )}
-
         <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !open && cancelDeleteTransaction()}>
           <AlertDialogContent>
             <AlertDialogHeader>

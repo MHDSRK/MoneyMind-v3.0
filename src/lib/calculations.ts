@@ -14,6 +14,7 @@ export interface FinancialMetrics {
   insuranceBalance: number;
   otherAssetsBalance: number;
   totalAssets: number;
+  lentBalance: number;
 
   creditCardOutstanding: number;
   creditCardUnbilled: number;
@@ -79,6 +80,10 @@ export function isTrackingTransaction(transaction: Transaction): boolean {
 
 export function getActiveFinancialAccounts(store: Store) {
   return store.accounts.filter(isFinancialAccount);
+}
+
+export function getActiveLentAccounts(store: Store) {
+  return store.accounts.filter((account) => !account.deleted && !account.archivedAt && isTrackingAccount(account));
 }
 
 export function getActiveLendRecords(store: Store) {
@@ -280,12 +285,14 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // Account Balances by Type
   // ─────────────────────────────────────────────────────────────────────────────
   const activeFinancialAccounts = getActiveFinancialAccounts(store);
+  const activeLentAccounts = getActiveLentAccounts(store);
   const activeCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
   const activeLoans = store.loans.filter((l) => !l.deleted && !l.archivedAt);
   const activeLiabilities = store.liabilities.filter((item) => !item.deleted && !item.archivedAt);
 
-  // Tracking-only lent records are stored separately and never participate in asset,
-  // net worth, available balance, dashboard summaries, or reports.
+  // Tracking-only Lent records are stored separately and never participate in
+  // asset totals, net worth, available balance, dashboard summaries, or reports.
+  // Lent accounts are also excluded from active financial accounts.
   const activeLendRecords = getActiveLendRecords(store);
 
   const cashBalance = activeFinancialAccounts
@@ -345,6 +352,10 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // ─────────────────────────────────────────────────────────────────────────────
   const netWorth = totalAssets - totalLiabilities;
 
+  const lentBalance =
+    activeLentAccounts.reduce((sum, account) => sum + account.balance, 0) +
+    activeLendRecords.reduce((sum, record) => sum + record.amount, 0);
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Today's Cash Flow
   // ─────────────────────────────────────────────────────────────────────────────
@@ -398,6 +409,7 @@ export function calculateMetrics(store: Store): FinancialMetrics {
 
     totalLiabilities,
     netWorth,
+    lentBalance,
 
     todayIncome,
     todayExpense,

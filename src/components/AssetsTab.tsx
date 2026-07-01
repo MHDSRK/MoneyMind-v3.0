@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useStore, Account, LendItem, archiveRecord } from "@/hooks/useStore";
 import { formatCurrency } from "@/lib/utils";
+import { calculateMetrics, isLentAccount } from "@/lib/calculations";
 import { MasterListRow } from "@/components/MasterListRow";
 import { RecordDetailsDialog } from "@/components/RecordDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { isLentAccount } from "@/lib/calculations";
 import { formatDisplayDate } from "@/utils/date";
 
 export function AssetsTab() {
@@ -22,6 +22,7 @@ export function AssetsTab() {
   const accountRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const visibleAccounts = store.accounts.filter((account) => !account.deleted && !account.archivedAt);
+  const financialMetrics = calculateMetrics(store);
   const activeLendAccounts = visibleAccounts.filter(isLentAccount);
   const financialAccounts = visibleAccounts.filter((account) => !isLentAccount(account));
   const bankAccounts = financialAccounts.filter((a) => a.type === "cash" || a.type === "bank");
@@ -38,11 +39,8 @@ export function AssetsTab() {
     ...activeLendAccounts.map((item) => ({ kind: "account" as const, item })),
     ...activeLends.map((item) => ({ kind: "lend" as const, item })),
   ];
-  const lentTotal = activeLentRecords.reduce(
-    (sum, record) => sum + (record.kind === "account" ? record.item.balance : record.item.amount),
-    0,
-  );
-  const totalAssets = bankTotal + businessTotal + investmentTotal + insuranceTotal;
+  const lentTotal = financialMetrics.lentBalance;
+  const totalAssets = financialMetrics.totalAssets;
   const [expandedSection, setExpandedSection] = useState<string | undefined>(undefined);
 
   useEffect(() => {

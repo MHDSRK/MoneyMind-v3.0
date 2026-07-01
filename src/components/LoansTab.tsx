@@ -96,22 +96,28 @@ export function LoansTab() {
                       <p className="text-sm font-semibold text-foreground truncate">{loan.name}</p>
                       <p className="mt-1 text-xs text-muted-foreground truncate">{subtitle}</p>
                     </div>
-                    <div className="text-right min-w-[120px] text-right">
-                      <p className="mt-1 text-sm font-semibold text-muted-foreground">{formatCurrency(loan.principal)}</p>
-                      <p className="mt-3 text-lg font-semibold text-destructive">{formatCurrency(loan.outstanding)}</p>
+                    <div className="text-right min-w-[180px] grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Loan</p>
+                        <p className="mt-1 text-sm font-semibold text-muted-foreground">{formatCurrency(loan.principal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Outstanding</p>
+                        <p className="mt-1 text-sm font-semibold text-destructive">{formatCurrency(loan.outstanding)}</p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                    <div className="rounded-2xl bg-white/5 px-3 py-3">
+                    <div className="rounded-2xl bg-white/5 p-3 text-center">
                       <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">EMI</p>
                       <p className="mt-2 text-sm font-semibold text-sky-400">{formatCurrency(loan.emiAmount)}</p>
                     </div>
-                    <div className="rounded-2xl bg-white/5 px-3 py-3">
+                    <div className="rounded-2xl bg-white/5 p-3 text-center">
                       <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">DATE</p>
                       <p className="mt-2 text-sm font-semibold text-foreground">{formatDisplayDate(loan.nextEmiDate, "Not set")}</p>
                     </div>
-                    <div className="rounded-2xl bg-white/5 px-3 py-3">
+                    <div className="rounded-2xl bg-white/5 p-3 text-center">
                       <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Remaining</p>
                       <p className="mt-2 text-sm font-semibold text-foreground">{remainingMonths} Months</p>
                     </div>
