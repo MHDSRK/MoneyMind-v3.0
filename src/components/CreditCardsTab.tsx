@@ -135,15 +135,9 @@ export function CreditCardsTab() {
                     <p className="text-sm font-semibold text-foreground truncate">{card.name}</p>
                     <p className="mt-1 text-xs text-muted-foreground truncate">{card.provider || card.cardType || "Credit card"}</p>
                   </div>
-                  <div className="min-w-[160px] grid gap-2 text-right">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Limit</p>
-                      <p className="mt-1 text-sm font-semibold text-muted-foreground">{formatCurrency(card.creditLimit)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Available</p>
-                      <p className="mt-1 text-sm font-semibold text-sky-400">{formatCurrency(cardAvailable(card))}</p>
-                    </div>
+                  <div className="min-w-[160px] grid gap-1 text-right">
+                    <p className="text-sm font-semibold text-muted-foreground">{formatCurrency(card.creditLimit)}</p>
+                    <p className="text-sm font-semibold text-sky-400">{formatCurrency(cardAvailable(card))}</p>
                   </div>
                 </div>
 
@@ -162,7 +156,7 @@ export function CreditCardsTab() {
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+                <div className="mt-3 grid grid-cols-[minmax(0,7fr)_minmax(0,3fr)] items-center gap-3">
                   <div className="rounded-2xl bg-white/5 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">₹</span>
@@ -196,7 +190,7 @@ export function CreditCardsTab() {
                       />
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white/5 px-3 py-2 text-right min-w-0">
+                  <div className="text-right min-w-0">
                     <div className="flex flex-col items-end gap-1">
                       <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground whitespace-nowrap">NEXT BILL</span>
                       <span className="text-sm font-semibold text-foreground">{formatDisplayDate(card.nextDueDate, "Not set")}</span>

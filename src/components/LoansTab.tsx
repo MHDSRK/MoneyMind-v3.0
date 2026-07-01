@@ -72,7 +72,7 @@ export function LoansTab() {
         <div className="text-2xl font-bold text-destructive">{formatCurrency(totalOutstanding)}</div>
       </div>
 
-      <div className="divide-y divide-white/10 overflow-hidden rounded-none bg-transparent">
+      <div className="space-y-4 overflow-hidden rounded-none bg-transparent">
         {visibleLoans.length === 0 ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">No active loans yet. Add one to begin.</div>
         ) : (
@@ -96,15 +96,9 @@ export function LoansTab() {
                       <p className="text-sm font-semibold text-foreground truncate">{loan.name}</p>
                       <p className="mt-1 text-xs text-muted-foreground truncate">{subtitle}</p>
                     </div>
-                    <div className="text-right min-w-[180px] grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Loan</p>
-                        <p className="mt-1 text-sm font-semibold text-muted-foreground">{formatCurrency(loan.principal)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Outstanding</p>
-                        <p className="mt-1 text-sm font-semibold text-destructive">{formatCurrency(loan.outstanding)}</p>
-                      </div>
+                    <div className="text-right min-w-[180px] grid gap-1">
+                      <p className="text-sm font-semibold text-muted-foreground">{formatCurrency(loan.principal)}</p>
+                      <p className="text-sm font-semibold text-destructive">{formatCurrency(loan.outstanding)}</p>
                     </div>
                   </div>
 
