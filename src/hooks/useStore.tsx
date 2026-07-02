@@ -469,17 +469,6 @@ function buildHistoryEvents(prev: Store, next: Store): HistoryEvent[] {
             details,
           }));
         }
-        return {
-          ...card,
-          unbilled: 0,
-          nextDueDate: newNext.toISOString(),
-          dueDate: newNext.toISOString().split("T")[0],
-          updatedAt: new Date().toISOString(),
-        };
-          entityId: nextItem.id,
-          entityName,
-          details,
-        }));
         return;
       }
 
@@ -1107,7 +1096,7 @@ export function processUpcomingDuePayment(
           ...card,
           unbilled: 0,
           nextDueDate: newNext.toISOString(),
-          dueDate: newNext.getDate(),
+          dueDate: newNext.toISOString().slice(0, 10),
           updatedAt: new Date().toISOString(),
         };
       }),
