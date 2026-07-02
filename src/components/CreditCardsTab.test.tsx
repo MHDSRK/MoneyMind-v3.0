@@ -20,7 +20,7 @@ function SeededCardPage() {
           outstanding: 0,
           unbilled: 0,
           statementDate: 1,
-          dueDate: 31,
+          dueDate: "2026-07-31",
           nextDueDate: "2026-07-22T10:00:00.000Z",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -48,7 +48,7 @@ describe("CreditCardsTab", () => {
 
     const text = container.textContent ?? "";
     expect(text).toContain("Due Date");
-    expect(text).toContain("31");
+    expect(text).toContain("31/Jul/2026");
     expect(text).toContain("22/Jul/2026");
 
     act(() => {

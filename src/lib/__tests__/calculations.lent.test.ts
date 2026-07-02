@@ -30,7 +30,7 @@ describe("Lent tracking exclusion", () => {
           outstanding: 200,
           unbilled: 0,
           statementDate: 1,
-          dueDate: 15,
+          dueDate: "2026-06-15",
           nextDueDate: "2026-06-30",
           deleted: false,
         },

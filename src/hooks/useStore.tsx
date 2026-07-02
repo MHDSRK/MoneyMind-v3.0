@@ -469,13 +469,13 @@ function buildHistoryEvents(prev: Store, next: Store): HistoryEvent[] {
             details,
           }));
         }
-        return;
-      }
-
-      if (!prevItem.deleted && nextItem.deleted) {
-        events.push(createHistoryEvent({
-          type: "delete",
-          entityType,
+        return {
+          ...card,
+          unbilled: 0,
+          nextDueDate: newNext.toISOString(),
+          dueDate: newNext.toISOString().split("T")[0],
+          updatedAt: new Date().toISOString(),
+        };
           entityId: nextItem.id,
           entityName,
           details,
