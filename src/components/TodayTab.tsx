@@ -30,12 +30,6 @@ import { ArrowLeftRight, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 
 type TransactionMode = "in" | "out" | "self";
 
-/* Literal union types for categories used across the UI and strict handlers. */
-type MoneyInCategory = "Income" | "Borrow" | "Business" | "Lent Pay Back" | "Others";
-type MoneyOutCategory = "Lent" | "Business" | "Others" | "Home Build" | "Personal" | "Travel" | "Medicine";
-
-author: /* keep the existing file's functionality unchanged */ undefined;
-
 export function TodayTab() {
   const { store, updateStore } = useStore();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -48,8 +42,7 @@ export function TodayTab() {
   const [ledger, setLedger] = useState("");
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
-  /* category state is typed as string initially because the store can contain custom categories; we validate before using */
-  const [category, setCategory] = useState<MoneyInCategory | MoneyOutCategory | string>("");
+  const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -77,20 +70,7 @@ export function TodayTab() {
   const visibleAccounts = store.accounts.filter((account) => !account.deleted && !account.archivedAt);
   const visibleCreditCards = store.creditCards.filter((card) => !card.deleted && !card.archivedAt);
 
-  /* Build typed option arrays from the project's default category lists. These represent the canonical, literal categories.
-     We only include names that match the literal unions below to preserve type-safety required by downstream handlers. */
-  const moneyInOptions: MoneyInCategory[] = DEFAULT_MONEY_IN_CATEGORY_NAMES as MoneyInCategory[];
-  const moneyOutOptions: MoneyOutCategory[] = DEFAULT_MONEY_OUT_CATEGORY_NAMES as MoneyOutCategory[];
-
-  /* Type guards to validate runtime strings before passing them to strict functions. */
-  function isMoneyInCategory(v: string): v is MoneyInCategory {
-    return (moneyInOptions as string[]).includes(v);
-  }
-  function isMoneyOutCategory(v: string): v is MoneyOutCategory {
-    return (moneyOutOptions as string[]).includes(v);
-  }
-
-  /* Source categories from store (may include custom categories) */
+  // Build category lists from the shared registry (store.categories).
   const moneyInCategories = store.categories
     .filter((categoryItem) => categoryItem.type === "in" && !categoryItem.deleted)
     .map((categoryItem) => categoryItem.name);
@@ -98,20 +78,19 @@ export function TodayTab() {
     .filter((categoryItem) => categoryItem.type === "out" && !categoryItem.deleted)
     .map((categoryItem) => categoryItem.name);
 
-  /* Keep the UI lists typed by only including canonical names first, then any additional store categories that also match the canonical lists.
-     This preserves the default ordering while ensuring the arrays used for selecting are typed. */
-  const sortedMoneyInCategories: MoneyInCategory[] = [
-    ...moneyInOptions.filter((name) => moneyInCategories.includes(name)),
+  // Put default/system categories first (preserve predefined order), then append any custom categories sorted alphabetically.
+  const sortedMoneyInCategories: string[] = [
+    ...DEFAULT_MONEY_IN_CATEGORY_NAMES.filter((name) => moneyInCategories.includes(name)),
     ...moneyInCategories
-      .filter((name) => !moneyInOptions.includes(name))
-      .filter((name): name is MoneyInCategory => isMoneyInCategory(name)),
+      .filter((name) => !DEFAULT_MONEY_IN_CATEGORY_NAMES.includes(name))
+      .sort((a, b) => a.localeCompare(b)),
   ];
 
-  const sortedMoneyOutCategories: MoneyOutCategory[] = [
-    ...moneyOutOptions.filter((name) => moneyOutCategories.includes(name)),
+  const sortedMoneyOutCategories: string[] = [
+    ...DEFAULT_MONEY_OUT_CATEGORY_NAMES.filter((name) => moneyOutCategories.includes(name)),
     ...moneyOutCategories
-      .filter((name) => !moneyOutOptions.includes(name))
-      .filter((name): name is MoneyOutCategory => isMoneyOutCategory(name)),
+      .filter((name) => !DEFAULT_MONEY_OUT_CATEGORY_NAMES.includes(name))
+      .sort((a, b) => a.localeCompare(b)),
   ];
 
   const resetTransactionForm = () => {
@@ -172,7 +151,7 @@ export function TodayTab() {
   };
 
   /* Convert TransactionMode to the project's canonical TransactionType without using unsafe casts. */
-  function modeToTransactionType(m: TransactionMode) : TransactionType {
+  function modeToTransactionType(m: TransactionMode): TransactionType {
     return m === "self" ? "transfer" : m;
   }
 
@@ -208,20 +187,6 @@ export function TodayTab() {
       ? `Self transfer: ₹${parsedAmount} from ${sourceAccount?.name ?? ""} to ${destinationAccount?.name ?? ""}`
       : ledger.trim();
 
-    /* Validate category before passing to strict Transaction definition. If the selected category is not one of the canonical
-       literal categories, we prevent save and ask user to choose a supported category. This keeps the functions strict and avoids
-       unsafe casts. */
-    if (!isSelfTransfer) {
-      if (txType === "in" && !isMoneyInCategory(String(category))) {
-        toast({ title: "Invalid category", description: "Please select a valid Money In category.", variant: "destructive" });
-        return;
-      }
-      if (txType === "out" && !isMoneyOutCategory(String(category))) {
-        toast({ title: "Invalid category", description: "Please select a valid Money Out category.", variant: "destructive" });
-        return;
-      }
-    }
-
     const nextTransaction: Transaction = {
       id: editingTransaction?.id ?? crypto.randomUUID(),
       date: editingTransaction?.date ?? todayStr,
@@ -251,8 +216,6 @@ export function TodayTab() {
 
     resetTransactionForm();
   };
-
-
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-6">
@@ -392,13 +355,13 @@ export function TodayTab() {
               <div className="flex-1 overflow-y-auto space-y-3 pt-3 pb-2">
                 <div className="flex items-center gap-1 border-b border-white/10 pb-3">
                   <span className="text-2xl font-light text-muted-foreground">₹</span>
-                  <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus className="bg-transparent text-3xl font-bold w-full focus:outline-no[...]
+                  <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus className="bg-transparent text-3xl font-bold w-full focus:outline-no[...]" />
                 </div>
 
                 {txType === "in" && (
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Select Account or Card</label>
-                    <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-[...]
+                    <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-[...]" >
                       <option value="" disabled>Select Account or Card</option>
                       {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
                       {visibleCreditCards.map((card) => (<option key={card.id} value={card.id}>💳 {card.name}</option>))}
@@ -409,7 +372,7 @@ export function TodayTab() {
                 {txType === "out" && (
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Select Account or Card</label>
-                    <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outl[...]
+                    <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outl[...]" >
                       <option value="" disabled>Select Account or Card</option>
                       {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
                       {visibleCreditCards.map((card) => (<option key={card.id} value={card.id}>💳 {card.name}</option>))}
@@ -421,14 +384,14 @@ export function TodayTab() {
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">From Account</label>
-                      <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:ou[...]
+                      <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:ou[...]" >
                         <option value="" disabled>Select Source Account</option>
                         {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
                       </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">To Account</label>
-                      <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outlin[...]
+                      <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outlin[...]" >
                         <option value="" disabled>Select Destination Account</option>
                         {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
                       </select>
@@ -438,7 +401,7 @@ export function TodayTab() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Ledger / Name</label>
-                  <input type="text" value={ledger} onChange={(e) => setLedger(e.target.value)} placeholder="E.g. Salary, Groceries..." className="w-full bg-black/20 border border-white/10 rounde[...]
+                  <input type="text" value={ledger} onChange={(e) => setLedger(e.target.value)} placeholder="E.g. Salary, Groceries..." className="w-full bg-black/20 border border-white/10 rounde[...]" />
                 </div>
 
                 <div className="space-y-1">
@@ -497,17 +460,9 @@ export function TodayTab() {
                             return;
                           }
 
+                          // Persist the new custom category and immediately select it.
                           updateStore((prev) => addCustomCategory(prev, trimmedName, txType));
-
-                          /* Only set the category in the UI if the newly added name matches the canonical literal lists.
-                             This ensures we don't assign an arbitrary string into places that expect strict literal unions. */
-                          if (txType === "in" && isMoneyInCategory(trimmedName)) {
-                            setCategory(trimmedName);
-                          } else if (txType === "out" && isMoneyOutCategory(trimmedName)) {
-                            setCategory(trimmedName);
-                          } else {
-                            toast({ title: "Category added", description: "Custom category saved but cannot be selected here due to type restrictions.", });
-                          }
+                          setCategory(trimmedName);
 
                           setNewCategoryName("");
                           setShowNewCategoryInput(false);
@@ -532,12 +487,12 @@ export function TodayTab() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Notes</label>
-                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none[...]
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none[...]" />
                 </div>
               </div>
 
               <div className="pt-2 pb-4">
-                <button onClick={handleSaveTransaction} disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))} clas[...]
+                <button onClick={handleSaveTransaction} disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition[...]">
                   {editingTransaction ? "Update Transaction" : "Save Transaction"}
                 </button>
               </div>
