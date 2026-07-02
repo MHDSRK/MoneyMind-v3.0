@@ -192,7 +192,7 @@ export function LiabilitiesTab() {
             ? [
                 { label: "Amount", value: formatCurrency(selectedLiability.amount) },
                 { label: "Group", value: selectedLiability.group },
-                { label: "Due Date", value: selectedLiability.dueDate || "Not set" },
+                { label: "Due Date", value: formatDisplayDate(selectedLiability.dueDate, "Not set") },
                 { label: "Notes", value: selectedLiability.notes?.trim() ? selectedLiability.notes : "Not set" },
               ]
             : []

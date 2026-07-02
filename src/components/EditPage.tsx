@@ -396,7 +396,7 @@ export function EditPage() {
         <EditAccordion key={id} label={entity.item.name} isOpen={isOpen} onToggle={toggle}>
           <EditableField label="Expense Name" value={entity.item.name} onEdit={() => openEditDialog(entity, 'Expense Name', entity.item.name, 'Edit expense name')} />
           <EditableField label="Amount" value={formatCurrency(entity.item.amount)} onEdit={() => openEditDialog(entity, 'Amount', entity.item.amount.toString(), 'Edit amount')} />
-          <EditableField label="Due Date" value={entity.item.dueDate || 'Not set'} onEdit={() => openEditDialog(entity, 'Due Date', entity.item.dueDate || '', 'Edit due date')} />
+          <EditableField label="Due Date" value={formatDisplayDate(entity.item.dueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Due Date', entity.item.dueDate || '', 'Edit due date')} />
           <EditableField label="Notes" value={entity.item.notes?.trim() ? entity.item.notes : 'Not set'} onEdit={() => openEditDialog(entity, 'Notes', entity.item.notes || '', 'Edit notes')} />
         </EditAccordion>
       );

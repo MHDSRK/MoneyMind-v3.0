@@ -92,9 +92,6 @@ export function CreditCardsTab() {
 
   const cardAvailable = (card: CreditCard) => Math.max(0, getCreditCardAvailableAmount(card));
   const cardDueAmount = (card: CreditCard) => getCreditCardDueAmount(card);
-  const formatDueDate = (dateString?: string) => {
-    return formatDisplayDate(dateString, "Not set");
-  };
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-4">

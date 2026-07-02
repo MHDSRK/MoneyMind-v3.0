@@ -85,6 +85,7 @@ export function EditDialog({
             type={type}
             value={draft}
             placeholder={placeholder}
+            readOnly={type === "date"}
             onChange={(event) => setDraft(event.target.value)}
             onFocus={handleDateFocus}
             onKeyDown={handleDateKeyDown}
