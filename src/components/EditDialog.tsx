@@ -110,7 +110,6 @@ export function EditDialog({
             type={type}
             value={draft}
             placeholder={placeholder}
-            readOnly={type === "date"}
             onChange={(event) => setDraft(event.target.value)}
             onFocus={handleDateFocus}
             onKeyDown={handleDateKeyDown}
@@ -121,9 +120,9 @@ export function EditDialog({
             }}
             className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             // Standardized date picker settings:
-            // - readOnly: Forces calendar picker only, no manual text entry
             // - type="date": Uses native HTML5 date input with built-in picker
             // - showPicker(): Triggered on focus to open calendar immediately
+            // - onKeyDown blocks manual typing for date fields
             // - paste prevented: Ensures calendar is the only input method
           />
         </div>
