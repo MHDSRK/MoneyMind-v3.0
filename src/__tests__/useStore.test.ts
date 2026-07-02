@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { freezeArchivedRecords, normalizeStore, Store } from "@/hooks/useStore";
+import { freezeArchivedRecords, normalizeStore, Store, isCategoryAvailableForTransactionType } from "@/hooks/useStore";
 
 describe("freezeArchivedRecords", () => {
   const createStore = (overrides: Partial<Store> = {}): Store => ({
@@ -209,5 +209,20 @@ describe("freezeArchivedRecords", () => {
 
     expect(consultingCategories).toHaveLength(1);
     expect(twice.transactions[0].category).toBe("Consulting");
+  });
+
+  it("accepts custom categories in the shared registry for the matching transaction type", () => {
+    const store = normalizeStore(
+      createStore({
+        categories: [
+          { id: "custom-in", name: "Freelance", type: "in" },
+          { id: "custom-out", name: "Groceries", type: "out" },
+        ],
+      })
+    );
+
+    expect(isCategoryAvailableForTransactionType(store, "Freelance", "in")).toBe(true);
+    expect(isCategoryAvailableForTransactionType(store, "Freelance", "out")).toBe(false);
+    expect(isCategoryAvailableForTransactionType(store, "Groceries", "out")).toBe(true);
   });
 });

@@ -603,6 +603,20 @@ export function EditPage() {
         </EditAccordion>
 
         <EditAccordion
+          label="Chitty"
+          isOpen={expandedCategory === "chitty"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "chitty" ? null : "chitty"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
+            {groups.chitty.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No chitty items found.</div>
+            ) : (
+              groups.chitty.map((item) => renderRecord({ type: 'liability', item }))
+            )}
+          </div>
+        </EditAccordion>
+
+        <EditAccordion
           label="Borrow"
           isOpen={expandedCategory === "borrowed"}
           onToggle={() => setExpandedCategory((prev) => (prev === "borrowed" ? null : "borrowed"))}
@@ -619,20 +633,6 @@ export function EditPage() {
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No borrowed items found.</div>
             ) : (
               groups.borrowed.map((item) => renderRecord({ type: 'liability', item }))
-            )}
-          </div>
-        </EditAccordion>
-
-        <EditAccordion
-          label="Chitty"
-          isOpen={expandedCategory === "chitty"}
-          onToggle={() => setExpandedCategory((prev) => (prev === "chitty" ? null : "chitty"))}
-        >
-          <div className="space-y-2 px-4 pb-4 pt-2">
-            {groups.chitty.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No chitty items found.</div>
-            ) : (
-              groups.chitty.map((item) => renderRecord({ type: 'liability', item }))
             )}
           </div>
         </EditAccordion>

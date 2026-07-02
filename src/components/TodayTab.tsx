@@ -9,9 +9,10 @@ import {
   DEFAULT_MONEY_IN_CATEGORY_NAMES,
   DEFAULT_MONEY_OUT_CATEGORY_NAMES,
   addCustomCategory,
+  isCategoryAvailableForTransactionType,
 } from "@/hooks/useStore";
 import { createTransaction } from "@/lib/transactionEffects";
-import { isTrackingTransaction } from "@/lib/calculations";
+import { isLentAccount, isTrackingTransaction } from "@/lib/calculations";
 import { toast } from "@/hooks/use-toast";
 import { formatAppDate } from "@/utils/date";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -155,6 +156,66 @@ export function TodayTab() {
     return m === "self" ? "transfer" : m;
   }
 
+  function getSpecialCategoryValidationMessage(categoryName: string, ledgerName: string, transactionMode: TransactionMode | null) {
+    if (!transactionMode || transactionMode === "self") return null;
+
+    const trimmedLedger = ledgerName.trim();
+    const trimmedCategory = categoryName.trim();
+
+    if (transactionMode === "out" && trimmedCategory === "Lent") {
+      if (!trimmedLedger) {
+        return { type: "error" as const, text: "Ledger name is required for Lent transactions." };
+      }
+      return { type: "info" as const, text: "This will create or update the matching Lent tracking record." };
+    }
+
+    if (transactionMode === "out" && trimmedCategory === "Borrow Pay Back") {
+      if (!trimmedLedger) {
+        return { type: "error" as const, text: "Ledger name is required for Borrow Pay Back transactions." };
+      }
+
+      const hasMatchingBorrowLiability = store.liabilities.some(
+        (item) =>
+          !item.deleted &&
+          !item.archivedAt &&
+          item.group === "Borrow" &&
+          item.name === trimmedLedger,
+      );
+
+      if (!hasMatchingBorrowLiability) {
+        return { type: "error" as const, text: "No matching Borrow liability found. Enter an existing active Borrow record name." };
+      }
+
+      return { type: "info" as const, text: "This will reduce the selected Borrow balance." };
+    }
+
+    if (transactionMode === "in" && trimmedCategory === "Lent Pay Back") {
+      if (!trimmedLedger) {
+        return { type: "error" as const, text: "Enter the exact name of an existing Lent account." };
+      }
+
+      const hasMatchingLentAccount = store.accounts.some(
+        (account) =>
+          !account.deleted &&
+          !account.archivedAt &&
+          isLentAccount(account) &&
+          account.name === trimmedLedger,
+      );
+
+      if (!hasMatchingLentAccount) {
+        return { type: "error" as const, text: "No matching Lent account found. Enter an existing active Lent account name." };
+      }
+
+      return { type: "info" as const, text: "This will reduce the selected Lent balance." };
+    }
+
+    return null;
+  }
+
+  const selectedCategoryName = String(category).trim();
+  const specialCategoryValidationMessage = getSpecialCategoryValidationMessage(selectedCategoryName, ledger, txType);
+  const hasSpecialCategoryValidationError = specialCategoryValidationMessage?.type === "error";
+
   const handleSaveTransaction = () => {
     if (!amount || !ledger || !category || !txType) return;
 
@@ -165,6 +226,26 @@ export function TodayTab() {
     }
 
     const isSelfTransfer = txType === "self";
+
+    if (!isSelfTransfer) {
+      const validationMessage = getSpecialCategoryValidationMessage(String(category), ledger, txType);
+      if (validationMessage?.type === "error") {
+        toast({ title: "Validation required", description: validationMessage.text, variant: "destructive" });
+        return;
+      }
+    }
+
+    if (!isSelfTransfer) {
+      const selectedCategory = String(category).trim();
+      if (txType === "in" && !isCategoryAvailableForTransactionType(store, selectedCategory, "in")) {
+        toast({ title: "Invalid category", description: "Please select a valid Money In category.", variant: "destructive" });
+        return;
+      }
+      if (txType === "out" && !isCategoryAvailableForTransactionType(store, selectedCategory, "out")) {
+        toast({ title: "Invalid category", description: "Please select a valid Money Out category.", variant: "destructive" });
+        return;
+      }
+    }
     const selectedFromAccountId = visibleAccounts.find((account) => account.id === fromAccountId)?.id;
     const selectedToAccountId = visibleAccounts.find((account) => account.id === toAccountId)?.id;
     const selectedFromCardId = visibleCreditCards.find((card) => card.id === fromAccountId)?.id;
@@ -325,7 +406,13 @@ export function TodayTab() {
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={(open) => (open ? setSheetOpen(true) : resetTransactionForm())}>
-        <SheetContent side="bottom" className="bg-[#0d1117] border-t border-white/10 rounded-t-2xl p-0 flex flex-col" style={{ height: "70vh", maxHeight: "70vh" }}>
+        <SheetContent
+          side="bottom"
+          title={editingTransaction ? "Edit transaction" : "Record transaction"}
+          description="Create or edit a transaction and choose its category and accounts."
+          className="bg-[#0d1117] border-t border-white/10 rounded-t-2xl p-0 flex flex-col"
+          style={{ height: "70vh", maxHeight: "70vh" }}
+        >
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/5">
             <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
               {editingTransaction ? "Edit Transaction" : "Record Transaction"}
@@ -452,6 +539,14 @@ export function TodayTab() {
                     placeholder="E.g. Salary, Groceries..."
                     className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none"
                   />
+                  {specialCategoryValidationMessage ? (
+                    <p className={cn(
+                      "text-xs",
+                      specialCategoryValidationMessage.type === "error" ? "text-destructive" : "text-amber-400"
+                    )}>
+                      {specialCategoryValidationMessage.text}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1">
@@ -549,7 +644,7 @@ export function TodayTab() {
               <div className="pt-2 pb-4">
                 <button
                   onClick={handleSaveTransaction}
-                  disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))}
+                  disabled={!amount || !ledger || !category || hasSpecialCategoryValidationError || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))}
                   className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition-all"
                 >
                   {editingTransaction ? "Update Transaction" : "Save Transaction"}

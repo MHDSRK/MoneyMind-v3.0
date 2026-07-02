@@ -111,6 +111,11 @@ export function LiabilitiesTab() {
                 <span className="ml-4 flex-shrink-0 text-right text-sm font-bold">{formatCurrency(groupTotal)}</span>
               </AccordionTrigger>
               <AccordionContent className="rounded-2xl border border-white/10 bg-white/5 px-0 py-0">
+                {group === "Borrow" && (
+                  <div className="border-b border-white/10 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+                    Tip: use the transaction form’s Borrow Pay Back category to settle an existing Borrow record directly.
+                  </div>
+                )}
                 {items.length === 0 ? (
                   <div className="px-4 py-4 text-sm text-muted-foreground">No items yet.</div>
                 ) : (

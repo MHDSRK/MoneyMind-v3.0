@@ -15,6 +15,7 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
       <div className="flex items-center justify-between px-4 pt-safe pt-14 pb-4 border-b border-white/10">
         <h2 className="text-base font-bold text-foreground tracking-wider">MENU</h2>
         <button
+          type="button"
           onClick={onClose}
           className="p-1.5 rounded-full bg-white/5 hover:bg-white/10"
         >

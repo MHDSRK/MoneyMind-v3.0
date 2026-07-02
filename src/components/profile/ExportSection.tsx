@@ -18,6 +18,7 @@ export function ExportSection() {
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between py-4 border-b border-white/5"
       >
@@ -53,6 +54,7 @@ export function ExportSection() {
           {/* Custom range */}
           <div>
             <button
+              type="button"
               onClick={() => setCustomOpen((o) => !o)}
               className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
             >
@@ -86,6 +88,7 @@ export function ExportSection() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   disabled={!customStart || !customEnd}
                   onClick={() =>
                     handleExport("custom", `Custom_${customStart}_to_${customEnd}`)

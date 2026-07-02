@@ -94,6 +94,7 @@ export function BackupSection() {
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between py-4 border-b border-white/5"
       >
@@ -117,6 +118,7 @@ export function BackupSection() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-foreground">Auto-backup (Daily)</span>
               <button
+                type="button"
                 onClick={() => handleAutoBackupToggle(!autoBackupEnabled)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   autoBackupEnabled
@@ -136,6 +138,7 @@ export function BackupSection() {
 
           {/* Manual backup */}
           <button
+            type="button"
             onClick={handleCreateBackup}
             className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
           >
@@ -145,6 +148,7 @@ export function BackupSection() {
 
           {/* Backups list toggle */}
           <button
+            type="button"
             onClick={() => setBackupsListOpen((o) => !o)}
             className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
           >
@@ -173,18 +177,21 @@ export function BackupSection() {
                     </p>
                     <div className="flex gap-1">
                       <button
+                        type="button"
                         onClick={() => handleRestoreBackup(backup.id)}
                         className="flex-1 text-[10px] bg-primary/20 border border-primary/30 text-primary px-2 py-1 rounded font-bold hover:bg-primary/30 transition-all"
                       >
                         Restore
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDownloadBackup(backup.id, backup.fileName)}
                         className="flex-1 text-[10px] bg-white/10 border border-white/20 text-muted-foreground px-2 py-1 rounded font-bold hover:bg-white/20 transition-all"
                       >
                         Download
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDeleteBackupLocal(backup.id)}
                         className="flex-1 text-[10px] bg-destructive/20 border border-destructive/30 text-destructive px-2 py-1 rounded font-bold hover:bg-destructive/30 transition-all"
                       >
@@ -199,6 +206,7 @@ export function BackupSection() {
 
           {/* Import from file */}
           <button
+            type="button"
             onClick={handleRestoreFromFile}
             className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between"
           >

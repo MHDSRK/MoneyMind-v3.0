@@ -180,6 +180,7 @@ export const DEFAULT_MONEY_IN_CATEGORY_NAMES = [
 export const DEFAULT_MONEY_OUT_CATEGORY_NAMES = [
   "Home Build",
   "Lent",
+  "Borrow Pay Back",
   "Business",
   "Personal",
   "Travel",
@@ -321,6 +322,7 @@ const INITIAL_DATA: Store = {
     { id: "others-in", name: "Others", type: "in" },
     { id: "home-build", name: "Home Build", type: "out" },
     { id: "lent", name: "Lent", type: "out" },
+    { id: "borrow-pay-back", name: "Borrow Pay Back", type: "out" },
     { id: "business-out", name: "Business", type: "out" },
     { id: "personal", name: "Personal", type: "out" },
     { id: "travel", name: "Travel", type: "out" },
@@ -1143,16 +1145,27 @@ function ensureCategoriesForTransactions(store: Store, transactions: Transaction
   };
 }
 
-export function addCustomCategory(store: Store, name: string, type: TransactionType): Store {
+export function isCategoryAvailableForTransactionType(
+  store: Store,
+  name: string,
+  type: TransactionType
+): boolean {
   const trimmedName = name.trim();
-  if (!trimmedName) return store;
+  if (!trimmedName) return false;
 
-  const existingCategory = store.categories.some(
+  return store.categories.some(
     (category) =>
       !category.deleted &&
       category.type === type &&
       category.name.trim().toLowerCase() === trimmedName.toLowerCase(),
   );
+}
+
+export function addCustomCategory(store: Store, name: string, type: TransactionType): Store {
+  const trimmedName = name.trim();
+  if (!trimmedName) return store;
+
+  const existingCategory = isCategoryAvailableForTransactionType(store, trimmedName, type);
 
   if (existingCategory) return store;
 

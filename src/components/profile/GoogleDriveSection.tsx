@@ -120,6 +120,7 @@ export function GoogleDriveSection() {
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between py-4 border-b border-white/5"
       >
@@ -143,6 +144,7 @@ export function GoogleDriveSection() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-foreground">Connection Status</span>
               <button
+                type="button"
                 onClick={connected ? handleDisconnect : handleConnect}
                 disabled={loading}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -164,6 +166,7 @@ export function GoogleDriveSection() {
           {connected && (
             <>
               <button
+                type="button"
                 onClick={handleUpload}
                 disabled={loading}
                 className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between disabled:opacity-50"
@@ -173,6 +176,7 @@ export function GoogleDriveSection() {
               </button>
 
               <button
+                type="button"
                 onClick={handleListBackups}
                 disabled={loading}
                 className="w-full text-left py-3 px-3 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all flex items-center justify-between disabled:opacity-50"
@@ -196,6 +200,7 @@ export function GoogleDriveSection() {
                       </p>
                       <div className="flex gap-2 mt-2">
                         <button
+                          type="button"
                           onClick={() => handleRestore(backup.id)}
                           disabled={loading}
                           className="flex-1 text-center py-1.5 px-2 rounded-lg bg-primary/20 text-primary text-[10px] font-bold hover:bg-primary/30 transition-all disabled:opacity-50"
@@ -203,6 +208,7 @@ export function GoogleDriveSection() {
                           Restore
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDownload(backup.id, backup.name)}
                           disabled={loading}
                           className="flex-1 text-center py-1.5 px-2 rounded-lg bg-white/10 text-muted-foreground text-[10px] font-bold hover:bg-white/20 transition-all disabled:opacity-50"
@@ -210,6 +216,7 @@ export function GoogleDriveSection() {
                           Download
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(backup.id)}
                           disabled={loading}
                           className="flex-1 text-center py-1.5 px-2 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-bold hover:bg-red-500/20 transition-all disabled:opacity-50"

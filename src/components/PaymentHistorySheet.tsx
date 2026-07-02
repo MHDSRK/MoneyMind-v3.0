@@ -133,6 +133,12 @@ export function PaymentHistorySheet({
                   type="date"
                   value={payDate}
                   onChange={(e) => setPayDate(e.target.value)}
+                  onFocus={(event) => event.currentTarget.showPicker?.()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Tab" || event.key === "Escape") return;
+                    event.preventDefault();
+                  }}
+                  onPaste={(event) => event.preventDefault()}
                   className="w-full mt-1 bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
                 />
               </div>

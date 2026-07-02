@@ -32,6 +32,85 @@ function SeededEditPage() {
 }
 
 describe("EditPage", () => {
+  it("uses a picker-based date input for editable dates", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <StoreProvider>
+          <EditPage />
+        </StoreProvider>,
+      );
+    });
+
+    const dueDateButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Due Date"));
+    expect(dueDateButton).toBeTruthy();
+
+    act(() => {
+      dueDateButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const dialogInput = document.body.querySelector("input[type='date']") as HTMLInputElement | null;
+    expect(dialogInput).toBeTruthy();
+    expect(dialogInput?.type).toBe("date");
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("orders the edit center groups in the approved navigation sequence", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <StoreProvider>
+          <EditPage />
+        </StoreProvider>,
+      );
+    });
+
+    const groupLabels = Array.from(container.querySelectorAll("button"))
+      .map((button) => button.textContent?.trim())
+      .filter((text): text is string => Boolean(text) && [
+        "Bank & Cash",
+        "Business",
+        "Investments",
+        "Insurance",
+        "Lent",
+        "Credit Cards",
+        "Loans",
+        "Regular Expenses",
+        "Chitty",
+        "Borrow",
+        "More Liabilities",
+      ].includes(text));
+
+    expect(groupLabels).toEqual([
+      "Bank & Cash",
+      "Business",
+      "Investments",
+      "Insurance",
+      "Lent",
+      "Credit Cards",
+      "Loans",
+      "Regular Expenses",
+      "Chitty",
+      "Borrow",
+      "More Liabilities",
+    ]);
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it("uses a date input for liability due dates", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

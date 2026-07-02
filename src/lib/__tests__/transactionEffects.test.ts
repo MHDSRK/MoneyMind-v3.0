@@ -233,4 +233,77 @@ describe("transactionEffects card timestamps", () => {
       })
     ).toThrow("Card payment cannot exceed the outstanding amount");
   });
+
+  it("settles a matching Borrow liability when a Borrow Pay Back transaction is created", () => {
+    const store = createStore({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "Checking",
+          type: "bank",
+          balance: 1000,
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-01T00:00:00.000Z",
+        },
+      ],
+      liabilities: [
+        {
+          id: "borrow-1",
+          group: "Borrow",
+          name: "Ravi",
+          amount: 500,
+          dueDate: "",
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const updated = createTransaction(store, {
+      type: "out",
+      amount: 200,
+      ledger: "Ravi",
+      category: "Borrow Pay Back",
+      fromAccountId: "acct-1",
+      date: "2026-06-16",
+    });
+
+    const liability = updated.liabilities.find((item) => item.id === "borrow-1");
+    const account = updated.accounts.find((item) => item.id === "acct-1");
+
+    expect(liability?.amount).toBe(300);
+    expect(account?.balance).toBe(800);
+  });
+
+  it("rejects Borrow Pay Back transactions when there is no matching Borrow liability", () => {
+    const store = createStore({
+      accounts: [
+        {
+          id: "acct-1",
+          name: "Checking",
+          type: "bank",
+          balance: 1000,
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(() =>
+      createTransaction(store, {
+        type: "out",
+        amount: 200,
+        ledger: "Ravi",
+        category: "Borrow Pay Back",
+        fromAccountId: "acct-1",
+        date: "2026-06-16",
+      })
+    ).toThrow("No matching Borrow liability found.");
+  });
 });

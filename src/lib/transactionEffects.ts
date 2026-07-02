@@ -198,6 +198,36 @@ function applyLentPayBack(store: Store, transaction: Transaction, direction: 1 |
   };
 }
 
+function applyBorrowPayBack(store: Store, transaction: Transaction, direction: 1 | -1): Store {
+  const ledgerName = transaction.ledger?.trim();
+  if (!ledgerName) {
+    throw new Error("Borrow Pay Back transactions require a Ledger name.");
+  }
+
+  const existingLiability = findBorrowLiabilityByName(store, ledgerName);
+  if (!existingLiability) {
+    throw new Error("No matching Borrow liability found.");
+  }
+
+  const nextAmount = existingLiability.amount - transaction.amount * direction;
+  if (nextAmount < 0) {
+    throw new Error("Borrow balance cannot become negative.");
+  }
+
+  return {
+    ...store,
+    liabilities: store.liabilities.map((item) =>
+      item.id === existingLiability.id
+        ? {
+            ...item,
+            amount: nextAmount,
+            updatedAt: new Date().toISOString(),
+          }
+        : item,
+    ),
+  };
+}
+
 export function applyTransactionEffects(
   store: Store,
   transaction: Partial<Transaction>,
@@ -291,6 +321,10 @@ export function applyTransactionEffects(
 
     if (!sourceAccount && !card) {
       throw new Error("Money Out requires a valid source account or card");
+    }
+
+    if (normalizedTransaction.category === "Borrow Pay Back") {
+      nextStore = applyBorrowPayBack(nextStore, normalizedTransaction, direction);
     }
 
     if (sourceAccount) {
