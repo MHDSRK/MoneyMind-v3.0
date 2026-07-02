@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as backupService from "@/lib/backupService";
+import { createTransaction } from "@/lib/transactionEffects";
+import { addMonths, parseISO } from "date-fns";
 
 export type TransactionType = "in" | "out" | "transfer";
 
@@ -541,7 +543,38 @@ export function updateCreditCard(store: Store, cardId: string, changes: Partial<
   return {
     ...store,
     creditCards: store.creditCards.map((card) =>
-      card.id === cardId ? updateRecord(card, changes) : card
+      card.id === cardId
+        ? (() => {
+            // Protect `nextDueDate` from accidental overwrites when only `dueDate` is being edited.
+            // Preserve the existing `nextDueDate` unless the caller explicitly provides a valid
+            // non-empty date string for `nextDueDate`.
+            const nextDueProvided = Object.prototype.hasOwnProperty.call(changes, "nextDueDate");
+            let safeNextDueDate = card.nextDueDate;
+
+            if (nextDueProvided && typeof changes.nextDueDate === "string") {
+              const candidate = changes.nextDueDate as string;
+              // If candidate looks like a plain integer (e.g. user input "10") it's likely the
+              // dueDate day and not a real ISO date — ignore that to avoid overwriting the billing date.
+              const looksLikeDayNumber = /^\d{1,2}$/.test(candidate.trim());
+              const looksLikeIsoDate = /\d{4}-\d{2}-\d{2}/.test(candidate);
+
+              if (looksLikeIsoDate) {
+                safeNextDueDate = candidate;
+              } else if (!looksLikeDayNumber && candidate.trim() !== "") {
+                // If it's a non-empty string that isn't a simple day number, accept it.
+                safeNextDueDate = candidate;
+              }
+              // Otherwise keep existing nextDueDate unchanged.
+            }
+
+            const mergedChanges: Partial<CreditCard> = {
+              ...changes,
+              nextDueDate: safeNextDueDate,
+            };
+
+            return updateRecord(card, mergedChanges);
+          })()
+        : card
     ),
   };
 }
@@ -1012,6 +1045,126 @@ export function normalizeStore(parsed: Partial<Store>): Store {
     categories: (parsed.categories ?? INITIAL_DATA.categories).map(normalizeCategory),
     history: (parsed.history ?? INITIAL_DATA.history).map(normalizeHistoryEvent),
   };
+}
+
+/**
+ * Process a payment for an upcoming due item.
+ * Applies a transaction (money out from selected account) and then
+ * applies entity-specific business-rule updates (credit-card, loan, liability).
+ */
+export function processUpcomingDuePayment(
+  store: Store,
+  params: {
+    entityType: "credit-card" | "loan" | "liability";
+    entityId: string;
+    fromAccountId: string;
+    amount: number;
+    date?: string;
+  }
+): Store {
+  const { entityType, entityId, fromAccountId, amount, date } = params;
+
+  const payDate = date ?? new Date().toISOString().slice(0, 10);
+
+  const fromAccount = store.accounts.find((a) => a.id === fromAccountId && !a.deleted && !a.archivedAt);
+  if (!fromAccount) return store;
+
+  const entityLabel = entityType === "loan" ? "Loan" : entityType === "credit-card" ? "Card" : "Liability";
+
+  // Record the payment transaction (outgoing from selected account)
+  const tx = {
+    id: crypto.randomUUID(),
+    date: payDate,
+    type: "out",
+    amount,
+    ledger: `${entityLabel} Payment: ${entityId}`,
+    category: entityType === "loan" ? "Loan Payment" : entityType === "credit-card" ? "Credit Card Payment" : "Liability Payment",
+    fromAccount: fromAccount.name,
+    fromAccountId: fromAccount.id,
+    notes: `Quick pay ${entityLabel}`,
+    tags: [],
+    relatedEntityType: entityType,
+    relatedEntityId: entityId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as any;
+
+  let nextStore = createTransaction(store, tx);
+
+  // Apply entity-specific updates
+  if (entityType === "credit-card") {
+    nextStore = {
+      ...nextStore,
+      creditCards: nextStore.creditCards.map((card) => {
+        if (card.id !== entityId) return card;
+
+        // Advance nextDueDate by one month (preserve day)
+        const base = card.nextDueDate ? parseISO(card.nextDueDate) : new Date();
+        const newNext = addMonths(base, 1);
+
+        return {
+          ...card,
+          unbilled: 0,
+          nextDueDate: newNext.toISOString(),
+          dueDate: newNext.getDate(),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    };
+  }
+
+  if (entityType === "loan") {
+    nextStore = {
+      ...nextStore,
+      loans: nextStore.loans.map((loan) => {
+        if (loan.id !== entityId) return loan;
+
+        const base = loan.nextEmiDate ? parseISO(loan.nextEmiDate) : new Date();
+        const newNextEmi = addMonths(base, 1);
+        const paidCount = (loan.paidCount ?? 0) + 1;
+        const emiAmount = loan.emiAmount ?? 0;
+        const newOutstanding = Math.max(0, (loan.outstanding ?? 0) - emiAmount);
+
+        return {
+          ...loan,
+          nextEmiDate: newNextEmi.toISOString(),
+          paidCount,
+          outstanding: newOutstanding,
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    };
+  }
+
+  if (entityType === "liability") {
+    nextStore = {
+      ...nextStore,
+      liabilities: nextStore.liabilities.map((item) => {
+        if (item.id !== entityId) return item;
+
+        // Determine group behaviour
+        if (item.group === "Borrow" || item.group === "More Liabilities") {
+          // Remove the liability (mark deleted)
+          return {
+            ...item,
+            deleted: true,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+
+        // Regular Expenses or Chitty: advance dueDate by one month
+        const base = item.dueDate ? parseISO(item.dueDate) : new Date();
+        const newDue = addMonths(base, 1);
+        return {
+          ...item,
+          dueDate: newDue.toISOString().split("T")[0],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    };
+  }
+
+  return nextStore;
 }
 
 function loadStore(): Store {

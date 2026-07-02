@@ -8,6 +8,8 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { formatAppDate } from "@/utils/date";
+import { SwipeableListItem } from "@/components/SwipeableListItem";
+import { processUpcomingDuePayment } from "@/hooks/useStore";
 
 type TransactionMode = "in" | "out" | "self";
 
@@ -33,6 +35,8 @@ export function HomeTab() {
   const todayNet = financialMetrics.todayIncome - financialMetrics.todayExpense;
 
   const upcomingDues = getUpcomingDues(store);
+  const [payOpenId, setPayOpenId] = useState<string | null>(null);
+  const [payFromAccountId, setPayFromAccountId] = useState<string>("");
 
   const handleSave = () => {
     if (!amount || !ledger || !category || !txType) return;
@@ -230,27 +234,94 @@ export function HomeTab() {
         ) : (
           <div className="divide-y divide-white/5">
             {upcomingDues.map((due) => (
-              <div key={due.id} className="flex items-center px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{due.name}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {due.daysLeft === 0
-                      ? "Due today"
-                      : due.daysLeft === 1
-                      ? "Tomorrow"
-                      : `In ${due.daysLeft} days`}
-                    {" · "}
-                    {formatAppDate(due.nextDueDate)}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "font-bold text-sm shrink-0",
-                    due.daysLeft === 0 ? "text-destructive" : "text-orange-400"
-                  )}
-                >
-                  {formatCurrency(due.dueAmount)}
-                </span>
+              <div key={due.id}>
+                <SwipeableListItem actionLabel="Mark as Paid" onAction={() => setPayOpenId(due.id)}>
+                  <div className="flex items-center px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{due.name}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {due.daysLeft === 0
+                          ? "Due today"
+                          : due.daysLeft === 1
+                          ? "Tomorrow"
+                          : `In ${due.daysLeft} days`}
+                        {" · "}
+                        {formatAppDate(due.nextDueDate)}
+                      </p>
+                    </div>
+                    <span className={cn("font-bold text-sm shrink-0", "text-destructive")}>
+                      {formatCurrency(due.dueAmount)}
+                    </span>
+                  </div>
+                </SwipeableListItem>
+
+                {payOpenId === due.id ? (
+                  <div className="px-4 pb-3 pt-2 bg-black/10 border-b border-white/5">
+                    <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Select Account</p>
+                    <select
+                      value={payFromAccountId}
+                      onChange={(e) => setPayFromAccountId(e.target.value)}
+                      className="w-full mt-2 bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
+                    >
+                      <option value="">Select Account or Card</option>
+                      {store.accounts
+                        .filter((a) => !a.deleted && !a.archivedAt && (a.type === "cash" || a.type === "bank"))
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} ({formatCurrency(a.balance)})
+                          </option>
+                        ))}
+                    </select>
+
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const amt = due.dueAmount;
+                          if (!payFromAccountId) {
+                            toast({ title: "Select a source account", variant: "destructive" });
+                            return;
+                          }
+
+                          const source = store.accounts.find((a) => a.id === payFromAccountId && !a.deleted && !a.archivedAt);
+                          if (!source) {
+                            toast({ title: "Select a valid source account", variant: "destructive" });
+                            return;
+                          }
+
+                          if (typeof source.balance === "number" && source.balance < amt) {
+                            toast({ title: "Insufficient balance in selected account", variant: "destructive" });
+                            return;
+                          }
+
+                          updateStore((prev) =>
+                            processUpcomingDuePayment(prev, {
+                              entityType: due.entityType,
+                              entityId: due.entityId,
+                              fromAccountId: payFromAccountId,
+                              amount: amt,
+                            })
+                          );
+
+                          toast({ title: "Payment recorded", description: `${formatCurrency(amt)} paid.` });
+                          setPayOpenId(null);
+                          setPayFromAccountId("");
+                        }}
+                        className="flex-1 bg-primary text-primary-foreground py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-all"
+                      >
+                        Pay {formatCurrency(due.dueAmount)}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPayOpenId(null);
+                          setPayFromAccountId("");
+                        }}
+                        className="px-4 bg-white/10 text-muted-foreground py-2 rounded-xl text-sm font-bold hover:bg-white/20 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
