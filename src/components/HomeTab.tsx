@@ -8,7 +8,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { formatAppDate } from "@/utils/date";
-import { SwipeableListItem } from "@/components/SwipeableListItem";
+import { SwipeableArchiveCard } from "@/components/SwipeableArchiveCard";
 import { processUpcomingDuePayment } from "@/hooks/useStore";
 
 type TransactionMode = "in" | "out" | "self";
@@ -236,21 +236,21 @@ export function HomeTab() {
           <div className="divide-y divide-white/5">
             {upcomingDues.map((due) => (
               <div key={due.id}>
-                <SwipeableListItem
+                <SwipeableArchiveCard
                   actionLabel="Mark as Paid"
+                  actionClassName="bg-destructive/95"
+                  revealWidth={112}
                   isOpen={openRowId === due.id}
                   onOpenChange={(open) => {
                     if (open) {
                       setOpenRowId(due.id);
-                      // ensure only one row open at a time
                       setPayOpenId(null);
                     } else if (openRowId === due.id) {
                       setOpenRowId(null);
                       setPayOpenId(null);
                     }
                   }}
-                  onAction={() => {
-                    // action button tapped - open account selector for this row
+                  onArchive={() => {
                     setPayOpenId(due.id);
                     setOpenRowId(due.id);
                   }}
@@ -272,7 +272,7 @@ export function HomeTab() {
                       {formatCurrency(due.dueAmount)}
                     </span>
                   </div>
-                </SwipeableListItem>
+                </SwipeableArchiveCard>
 
                 {payOpenId === due.id && openRowId === due.id ? (
                   <div className="px-4 pb-3 pt-2 bg-black/10 border-b border-white/5">

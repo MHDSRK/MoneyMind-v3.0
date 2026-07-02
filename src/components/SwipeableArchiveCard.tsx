@@ -109,7 +109,7 @@ export function SwipeableArchiveCard({
       onPointerCancel={handlePointerCancel}
     >
       <div
-        className="relative z-10 transition-transform duration-200 ease-out"
+        className="relative z-10 w-full bg-inherit transition-transform duration-200 ease-out"
         style={{ transform: `translateX(${offset}px)` }}
       >
         {children}
