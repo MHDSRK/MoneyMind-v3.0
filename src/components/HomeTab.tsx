@@ -7,6 +7,7 @@ import {
   DEFAULT_MONEY_IN_CATEGORY_NAMES,
   DEFAULT_MONEY_OUT_CATEGORY_NAMES,
   addCustomCategory,
+  processUpcomingDuePayment,
 } from "@/hooks/useStore";
 import { calculateMetrics, getUpcomingDues } from "@/lib/calculations";
 import { createTransaction } from "@/lib/transactionEffects";
@@ -16,9 +17,12 @@ import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { formatAppDate } from "@/utils/date";
 import { SwipeableArchiveCard } from "@/components/SwipeableArchiveCard";
-import { processUpcomingDuePayment } from "@/hooks/useStore";
 
 type TransactionMode = "in" | "out" | "self";
+
+/* Literal union types for categories used across the UI and strict handlers. */
+type MoneyInCategory = "Income" | "Borrow" | "Business" | "Lent Pay Back" | "Others";
+type MoneyOutCategory = "Lent" | "Business" | "Others" | "Home Build" | "Personal" | "Travel" | "Medicine";
 
 export function HomeTab() {
   const { store, updateStore } = useStore();
@@ -32,7 +36,8 @@ export function HomeTab() {
   const [ledger, setLedger] = useState("");
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
-  const [category, setCategory] = useState("");
+  /* category state typed to allow literal categories but still accept custom store names; validated before save */
+  const [category, setCategory] = useState<MoneyInCategory | MoneyOutCategory | string>("");
   const [notes, setNotes] = useState("");
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -48,82 +53,21 @@ export function HomeTab() {
   const [payFromAccountId, setPayFromAccountId] = useState<string>("");
   const [openRowId, setOpenRowId] = useState<string | null>(null);
 
-  const handleSave = () => {
-    if (!amount || !ledger || !category || !txType) return;
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt <= 0) return;
-
-    const isSelfTransfer = txType === "self";
-    const selectedFromAccountId = visibleAccounts.find((account) => account.id === fromAccountId)?.id;
-    const selectedToAccountId = visibleAccounts.find((account) => account.id === toAccountId)?.id;
-    const selectedFromCardId = visibleCreditCards.find((card) => card.id === fromAccountId)?.id;
-    const selectedToCardId = visibleCreditCards.find((card) => card.id === toAccountId)?.id;
-    const sourceAccount = visibleAccounts.find((account) => account.id === selectedFromAccountId);
-    const destinationAccount = visibleAccounts.find((account) => account.id === selectedToAccountId);
-    const sourceCard = visibleCreditCards.find((card) => card.id === selectedFromCardId);
-    const sourceName = txType === "out"
-      ? (sourceAccount?.name ?? sourceCard?.name ?? "")
-      : txType === "self"
-        ? (sourceAccount?.name ?? "")
-        : undefined;
-    const destinationName = txType === "in"
-      ? (destinationAccount?.name ?? "")
-      : txType === "self"
-        ? (destinationAccount?.name ?? "")
-        : undefined;
-    const ledgerLabel = isSelfTransfer
-      ? `Self transfer: ₹${amt} from ${sourceAccount?.name ?? ""} to ${destinationAccount?.name ?? ""}`
-      : ledger;
-
-    const newTx: Transaction = {
-      id: crypto.randomUUID(),
-      date: todayStr,
-      type: isSelfTransfer ? "transfer" : txType,
-      amount: amt,
-      fromAccount: txType === "out" ? sourceName : txType === "self" ? sourceAccount?.name : undefined,
-      toAccount: txType === "in" ? destinationName : txType === "self" ? destinationAccount?.name : undefined,
-      fromAccountId: txType === "out" || txType === "self" ? sourceAccount?.id : undefined,
-      fromCardId: txType === "out" ? selectedFromCardId : undefined,
-      toAccountId: txType === "in" || txType === "self" ? destinationAccount?.id : undefined,
-      toCardId: txType === "in" ? selectedToCardId : undefined,
-      ledger: ledgerLabel,
-      category: txType === "self" ? "Self Transfer" : category,
-      notes,
-      tags: selectedTags,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    updateStore((prev) => createTransaction(prev, newTx));
-
-    setAmount("");
-    setLedger("");
-    setFromAccountId("");
-    setToAccountId("");
-    setCategory("");
-    setNotes("");
-    setSelectedTags([]);
-    setShowNewCategoryInput(false);
-    setNewCategoryName("");
-    setTxType(null);
-    setSheetOpen(false);
-    toast({ title: "Transaction saved", description: "Your update was recorded instantly." });
-  };
-
-  const handleClose = () => {
-    setSheetOpen(false);
-    setTxType(null);
-    setAmount("");
-    setLedger("");
-    setFromAccountId("");
-    setToAccountId("");
-    setCategory("");
-    setNotes("");
-    setSelectedTags([]);
-  };
-
   const visibleAccounts = store.accounts.filter((a) => !a.deleted && !a.archivedAt);
   const visibleCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
+
+  /* Build typed option arrays from the project's default category lists. */
+  const moneyInOptions: MoneyInCategory[] = DEFAULT_MONEY_IN_CATEGORY_NAMES as MoneyInCategory[];
+  const moneyOutOptions: MoneyOutCategory[] = DEFAULT_MONEY_OUT_CATEGORY_NAMES as MoneyOutCategory[];
+
+  /* Type guards to validate runtime strings before passing them to strict functions. */
+  function isMoneyInCategory(v: string): v is MoneyInCategory {
+    return (moneyInOptions as string[]).includes(v);
+  }
+  function isMoneyOutCategory(v: string): v is MoneyOutCategory {
+    return (moneyOutOptions as string[]).includes(v);
+  }
+
   const moneyInCategories = store.categories
     .filter((c) => c.type === "in" && !c.deleted)
     .map((c) => c.name);
@@ -131,18 +75,18 @@ export function HomeTab() {
     .filter((c) => c.type === "out" && !c.deleted)
     .map((c) => c.name);
 
-  const sortedMoneyInCategories = [
-    ...DEFAULT_MONEY_IN_CATEGORY_NAMES.filter((name) => moneyInCategories.includes(name)),
+  const sortedMoneyInCategories: MoneyInCategory[] = [
+    ...moneyInOptions.filter((name) => moneyInCategories.includes(name)),
     ...moneyInCategories
-      .filter((name) => !DEFAULT_MONEY_IN_CATEGORY_NAMES.includes(name))
-      .sort((a, b) => a.localeCompare(b)),
+      .filter((name) => !moneyInOptions.includes(name))
+      .filter((name): name is MoneyInCategory => isMoneyInCategory(name)),
   ];
 
-  const sortedMoneyOutCategories = [
-    ...DEFAULT_MONEY_OUT_CATEGORY_NAMES.filter((name) => moneyOutCategories.includes(name)),
+  const sortedMoneyOutCategories: MoneyOutCategory[] = [
+    ...moneyOutOptions.filter((name) => moneyOutCategories.includes(name)),
     ...moneyOutCategories
-      .filter((name) => !DEFAULT_MONEY_OUT_CATEGORY_NAMES.includes(name))
-      .sort((a, b) => a.localeCompare(b)),
+      .filter((name) => !moneyOutOptions.includes(name))
+      .filter((name): name is MoneyOutCategory => isMoneyOutCategory(name)),
   ];
 
   const moneyInSelect = (
@@ -188,6 +132,97 @@ export function HomeTab() {
       ))}
     </select>
   );
+
+  /* Convert TransactionMode to the project's canonical TransactionType without unsafe casts. */
+  function modeToTransactionType(m: TransactionMode): TransactionType {
+    return m === "self" ? "transfer" : m;
+  }
+
+  const handleSave = () => {
+    if (!amount || !ledger || !category || !txType) return;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+
+    const isSelfTransfer = txType === "self";
+    const selectedFromAccountId = visibleAccounts.find((account) => account.id === fromAccountId)?.id;
+    const selectedToAccountId = visibleAccounts.find((account) => account.id === toAccountId)?.id;
+    const selectedFromCardId = visibleCreditCards.find((card) => card.id === fromAccountId)?.id;
+    const selectedToCardId = visibleCreditCards.find((card) => card.id === toAccountId)?.id;
+    const sourceAccount = visibleAccounts.find((account) => account.id === selectedFromAccountId);
+    const destinationAccount = visibleAccounts.find((account) => account.id === selectedToAccountId);
+    const sourceCard = visibleCreditCards.find((card) => card.id === selectedFromCardId);
+    const sourceName = txType === "out"
+      ? (sourceAccount?.name ?? sourceCard?.name ?? "")
+      : txType === "self"
+        ? (sourceAccount?.name ?? "")
+        : undefined;
+    const destinationName = txType === "in"
+      ? (destinationAccount?.name ?? "")
+      : txType === "self"
+        ? (destinationAccount?.name ?? "")
+        : undefined;
+    const ledgerLabel = isSelfTransfer
+      ? `Self transfer: ₹${amt} from ${sourceAccount?.name ?? ""} to ${destinationAccount?.name ?? ""}`
+      : ledger;
+
+    /* Validate category before saving. */
+    if (!isSelfTransfer) {
+      if (txType === "in" && !isMoneyInCategory(String(category))) {
+        toast({ title: "Invalid category", description: "Please select a valid Money In category.", variant: "destructive" });
+        return;
+      }
+      if (txType === "out" && !isMoneyOutCategory(String(category))) {
+        toast({ title: "Invalid category", description: "Please select a valid Money Out category.", variant: "destructive" });
+        return;
+      }
+    }
+
+    const newTx: Transaction = {
+      id: crypto.randomUUID(),
+      date: todayStr,
+      type: isSelfTransfer ? "transfer" : modeToTransactionType(txType),
+      amount: amt,
+      fromAccount: txType === "out" ? sourceName : txType === "self" ? sourceAccount?.name : undefined,
+      toAccount: txType === "in" ? destinationName : txType === "self" ? destinationAccount?.name : undefined,
+      fromAccountId: txType === "out" || txType === "self" ? sourceAccount?.id : undefined,
+      fromCardId: txType === "out" ? selectedFromCardId : undefined,
+      toAccountId: txType === "in" || txType === "self" ? destinationAccount?.id : undefined,
+      toCardId: txType === "in" ? selectedToCardId : undefined,
+      ledger: ledgerLabel,
+      category: txType === "self" ? "Self Transfer" : String(category),
+      notes,
+      tags: selectedTags,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    updateStore((prev) => createTransaction(prev, newTx));
+
+    setAmount("");
+    setLedger("");
+    setFromAccountId("");
+    setToAccountId("");
+    setCategory("");
+    setNotes("");
+    setSelectedTags([]);
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
+    setTxType(null);
+    setSheetOpen(false);
+    toast({ title: "Transaction saved", description: "Your update was recorded instantly." });
+  };
+
+  const handleClose = () => {
+    setSheetOpen(false);
+    setTxType(null);
+    setAmount("");
+    setLedger("");
+    setFromAccountId("");
+    setToAccountId("");
+    setCategory("");
+    setNotes("");
+    setSelectedTags([]);
+  };
 
   return (
     <div className="pb-32 px-4 pt-24 space-y-6">
@@ -379,7 +414,7 @@ export function HomeTab() {
         <button
           onClick={() => setSheetOpen(true)}
           data-testid="button-add-transaction"
-          className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.5)] hover:scale-105 active:scale-95 transition-all"
+          className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.5)] hover:scale-105 active:scale-95 transition-a[...]"
         >
           <Plus className="w-7 h-7" />
         </button>
@@ -422,20 +457,20 @@ export function HomeTab() {
               <button
                 onClick={() => setTxType("in")}
                 data-testid="button-money-in"
-                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-[#34d399]/10 border border-[#34d399]/20 text-[#34d399] font-bold text-sm hover:bg-[#34d399]/20 active:scale-95 transition-all"
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-[#34d399]/10 border border-[#34d399]/20 text-[#34d399] font-bold text-sm hover:bg-[#34d399]/20"
               >
                 <ArrowDownToLine className="w-4 h-4" /> Money In
               </button>
               <button
                 onClick={() => setTxType("out")}
                 data-testid="button-money-out"
-                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm hover:bg-destructive/20 active:scale-95 transition-all"
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive font-bold text-sm hover:bg-destructive/20"
               >
                 <ArrowUpFromLine className="w-4 h-4" /> Money Out
               </button>
               <button
                 onClick={() => setTxType("self")}
-                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-sm hover:bg-primary/20 active:scale-95 transition-all"
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-sm hover:bg-primary/20 active:scale-95"
               >
                 <ArrowLeftRight className="w-4 h-4" /> Self
               </button>
@@ -583,7 +618,16 @@ export function HomeTab() {
                           }
 
                           updateStore((prev) => addCustomCategory(prev, trimmedName, txType));
-                          setCategory(trimmedName);
+
+                          /* Only set the category in the UI if the newly added name matches the canonical literal lists. */
+                          if (txType === "in" && isMoneyInCategory(trimmedName)) {
+                            setCategory(trimmedName);
+                          } else if (txType === "out" && isMoneyOutCategory(trimmedName)) {
+                            setCategory(trimmedName);
+                          } else {
+                            toast({ title: "Category added", description: "Custom category saved but cannot be selected here due to type restrictions.", });
+                          }
+
                           setNewCategoryName("");
                           setShowNewCategoryInput(false);
                         }}
@@ -604,6 +648,11 @@ export function HomeTab() {
                     </div>
                   )}
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Notes</label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none[...]" />
+                </div>
               </div>
 
               <div className="pt-2 pb-4">
@@ -611,7 +660,7 @@ export function HomeTab() {
                   onClick={handleSave}
                   disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))}
                   data-testid="button-save-transaction"
-                  className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition-all active:scale-[0.98]"
+                  className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition[...]"
                 >
                   Save Transaction
                 </button>
