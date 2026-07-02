@@ -57,8 +57,8 @@ export function HomeTab() {
   const visibleCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
 
   /* Build typed option arrays from the project's default category lists. */
-  const moneyInOptions: MoneyInCategory[] = DEFAULT_MONEY_IN_CATEGORY_NAMES as MoneyInCategory[];
-  const moneyOutOptions: MoneyOutCategory[] = DEFAULT_MONEY_OUT_CATEGORY_NAMES as MoneyOutCategory[];
+  const moneyInOptions = Array.from(DEFAULT_MONEY_IN_CATEGORY_NAMES) as string[];
+  const moneyOutOptions = Array.from(DEFAULT_MONEY_OUT_CATEGORY_NAMES) as string[];
 
   /* Type guards to validate runtime strings before passing them to strict functions. */
   function isMoneyInCategory(v: string): v is MoneyInCategory {
@@ -75,19 +75,15 @@ export function HomeTab() {
     .filter((c) => c.type === "out" && !c.deleted)
     .map((c) => c.name);
 
-  const sortedMoneyInCategories: MoneyInCategory[] = [
+  const sortedMoneyInCategories = [
     ...moneyInOptions.filter((name) => moneyInCategories.includes(name)),
-    ...moneyInCategories
-      .filter((name) => !moneyInOptions.includes(name))
-      .filter((name): name is MoneyInCategory => isMoneyInCategory(name)),
-  ];
+    ...moneyInCategories.filter((name) => !moneyInOptions.includes(name)),
+  ] as string[];
 
-  const sortedMoneyOutCategories: MoneyOutCategory[] = [
+  const sortedMoneyOutCategories = [
     ...moneyOutOptions.filter((name) => moneyOutCategories.includes(name)),
-    ...moneyOutCategories
-      .filter((name) => !moneyOutOptions.includes(name))
-      .filter((name): name is MoneyOutCategory => isMoneyOutCategory(name)),
-  ];
+    ...moneyOutCategories.filter((name) => !moneyOutOptions.includes(name)),
+  ] as string[];
 
   const moneyInSelect = (
     <select
@@ -617,7 +613,7 @@ export function HomeTab() {
                             return;
                           }
 
-                          updateStore((prev) => addCustomCategory(prev, trimmedName, txType));
+                          updateStore((prev) => addCustomCategory(prev, trimmedName, txType === "self" ? "out" : txType));
 
                           /* Only set the category in the UI if the newly added name matches the canonical literal lists. */
                           if (txType === "in" && isMoneyInCategory(trimmedName)) {

@@ -82,14 +82,14 @@ export function TodayTab() {
   const sortedMoneyInCategories: string[] = [
     ...DEFAULT_MONEY_IN_CATEGORY_NAMES.filter((name) => moneyInCategories.includes(name)),
     ...moneyInCategories
-      .filter((name) => !DEFAULT_MONEY_IN_CATEGORY_NAMES.includes(name))
+      .filter((name) => !DEFAULT_MONEY_IN_CATEGORY_NAMES.includes(name as (typeof DEFAULT_MONEY_IN_CATEGORY_NAMES)[number]))
       .sort((a, b) => a.localeCompare(b)),
   ];
 
   const sortedMoneyOutCategories: string[] = [
     ...DEFAULT_MONEY_OUT_CATEGORY_NAMES.filter((name) => moneyOutCategories.includes(name)),
     ...moneyOutCategories
-      .filter((name) => !DEFAULT_MONEY_OUT_CATEGORY_NAMES.includes(name))
+      .filter((name) => !DEFAULT_MONEY_OUT_CATEGORY_NAMES.includes(name as (typeof DEFAULT_MONEY_OUT_CATEGORY_NAMES)[number]))
       .sort((a, b) => a.localeCompare(b)),
   ];
 
@@ -337,15 +337,24 @@ export function TodayTab() {
 
           {!txType ? (
             <div className="flex-1 px-5 py-4 space-y-3">
-              <button onClick={() => setTxType("in")} className="w-full flex items-center justify-between rounded-xl bg-[#34d399]/10 border border-[#34d399]/20 p-3 text-left text-sm font-semibold[...]
+              <button
+                onClick={() => setTxType("in")}
+                className="w-full flex items-center justify-between rounded-xl bg-[#34d399]/10 border border-[#34d399]/20 p-3 text-left text-sm font-semibold"
+              >
                 <span className="flex items-center gap-2"><ArrowDownToLine className="w-4 h-4" /> Money In</span>
                 <span className="text-xs text-muted-foreground">Income / payment received</span>
               </button>
-              <button onClick={() => setTxType("out")} className="w-full flex items-center justify-between rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-left text-sm font-sem[...]
+              <button
+                onClick={() => setTxType("out")}
+                className="w-full flex items-center justify-between rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-left text-sm font-semibold"
+              >
                 <span className="flex items-center gap-2"><ArrowUpFromLine className="w-4 h-4" /> Money Out</span>
                 <span className="text-xs text-muted-foreground">Expense / payment made</span>
               </button>
-              <button onClick={() => setTxType("self")} className="w-full flex items-center justify-between rounded-xl bg-primary/10 border border-primary/20 p-3 text-left text-sm font-semibold t[...]
+              <button
+                onClick={() => setTxType("self")}
+                className="w-full flex items-center justify-between rounded-xl bg-primary/10 border border-primary/20 p-3 text-left text-sm font-semibold"
+              >
                 <span className="flex items-center gap-2"><ArrowLeftRight className="w-4 h-4" /> Self Transfer</span>
                 <span className="text-xs text-muted-foreground">Move money between accounts</span>
               </button>
@@ -355,16 +364,31 @@ export function TodayTab() {
               <div className="flex-1 overflow-y-auto space-y-3 pt-3 pb-2">
                 <div className="flex items-center gap-1 border-b border-white/10 pb-3">
                   <span className="text-2xl font-light text-muted-foreground">₹</span>
-                  <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus className="bg-transparent text-3xl font-bold w-full focus:outline-no[...]" />
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    autoFocus
+                    className="bg-transparent text-3xl font-bold w-full focus:outline-none"
+                  />
                 </div>
 
                 {txType === "in" && (
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Select Account or Card</label>
-                    <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-[...]" >
+                    <select
+                      value={toAccountId}
+                      onChange={(e) => setToAccountId(e.target.value)}
+                      className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none"
+                    >
                       <option value="" disabled>Select Account or Card</option>
-                      {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
-                      {visibleCreditCards.map((card) => (<option key={card.id} value={card.id}>💳 {card.name}</option>))}
+                      {visibleAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>{account.name}</option>
+                      ))}
+                      {visibleCreditCards.map((card) => (
+                        <option key={card.id} value={card.id}>💳 {card.name}</option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -372,10 +396,18 @@ export function TodayTab() {
                 {txType === "out" && (
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Select Account or Card</label>
-                    <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outl[...]" >
+                    <select
+                      value={fromAccountId}
+                      onChange={(e) => setFromAccountId(e.target.value)}
+                      className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none"
+                    >
                       <option value="" disabled>Select Account or Card</option>
-                      {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
-                      {visibleCreditCards.map((card) => (<option key={card.id} value={card.id}>💳 {card.name}</option>))}
+                      {visibleAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>{account.name}</option>
+                      ))}
+                      {visibleCreditCards.map((card) => (
+                        <option key={card.id} value={card.id}>💳 {card.name}</option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -384,16 +416,28 @@ export function TodayTab() {
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">From Account</label>
-                      <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:ou[...]" >
+                      <select
+                        value={fromAccountId}
+                        onChange={(e) => setFromAccountId(e.target.value)}
+                        className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none"
+                      >
                         <option value="" disabled>Select Source Account</option>
-                        {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
+                        {visibleAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>{account.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">To Account</label>
-                      <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outlin[...]" >
+                      <select
+                        value={toAccountId}
+                        onChange={(e) => setToAccountId(e.target.value)}
+                        className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none"
+                      >
                         <option value="" disabled>Select Destination Account</option>
-                        {visibleAccounts.map((account) => (<option key={account.id} value={account.id}>{account.name}</option>))}
+                        {visibleAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>{account.name}</option>
+                        ))}
                       </select>
                     </div>
                   </>
@@ -401,7 +445,13 @@ export function TodayTab() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Ledger / Name</label>
-                  <input type="text" value={ledger} onChange={(e) => setLedger(e.target.value)} placeholder="E.g. Salary, Groceries..." className="w-full bg-black/20 border border-white/10 rounde[...]" />
+                  <input
+                    type="text"
+                    value={ledger}
+                    onChange={(e) => setLedger(e.target.value)}
+                    placeholder="E.g. Salary, Groceries..."
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -461,7 +511,7 @@ export function TodayTab() {
                           }
 
                           // Persist the new custom category and immediately select it.
-                          updateStore((prev) => addCustomCategory(prev, trimmedName, txType));
+                          updateStore((prev) => addCustomCategory(prev, trimmedName, txType === "self" ? "out" : txType));
                           setCategory(trimmedName);
 
                           setNewCategoryName("");
@@ -487,12 +537,21 @@ export function TodayTab() {
 
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Notes</label>
-                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add notes" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none[...]" />
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add notes"
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-3 focus:outline-none"
+                  />
                 </div>
               </div>
 
               <div className="pt-2 pb-4">
-                <button onClick={handleSaveTransaction} disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition[...]">
+                <button
+                  onClick={handleSaveTransaction}
+                  disabled={!amount || !ledger || !category || (txType === "self" && (!fromAccountId || !toAccountId || fromAccountId === toAccountId))}
+                  className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_0_12px_rgba(34,211,238,0.3)] disabled:opacity-40 disabled:shadow-none transition-all"
+                >
                   {editingTransaction ? "Update Transaction" : "Save Transaction"}
                 </button>
               </div>

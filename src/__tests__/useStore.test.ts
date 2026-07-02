@@ -139,4 +139,75 @@ describe("freezeArchivedRecords", () => {
     expect(input.accounts).toHaveLength(1);
     expect(input.accounts[0].notes).toBe("Paid on June 15");
   });
+
+  it("registers missing transaction categories without changing the stored category names", () => {
+    const input = normalizeStore(
+      createStore({
+        transactions: [
+          {
+            id: "tx-1",
+            date: "2026-07-01",
+            ledger: "Freelance client",
+            amount: 100,
+            type: "in",
+            category: "Freelance",
+            notes: "",
+            tags: [],
+          },
+          {
+            id: "tx-2",
+            date: "2026-07-01",
+            ledger: "Groceries",
+            amount: 50,
+            type: "out",
+            category: "Groceries",
+            notes: "",
+            tags: [],
+          },
+        ],
+        categories: [
+          { id: "income", name: "Income", type: "in" },
+          { id: "others-out", name: "Others", type: "out" },
+        ],
+      })
+    );
+
+    expect(input.transactions[0].category).toBe("Freelance");
+    expect(input.transactions[1].category).toBe("Groceries");
+
+    const incomeCategories = input.categories.filter((category) => category.type === "in");
+    const outCategories = input.categories.filter((category) => category.type === "out");
+
+    expect(incomeCategories.map((category) => category.name)).toContain("Freelance");
+    expect(outCategories.map((category) => category.name)).toContain("Groceries");
+    expect(incomeCategories.filter((category) => category.name === "Freelance")).toHaveLength(1);
+    expect(outCategories.filter((category) => category.name === "Groceries")).toHaveLength(1);
+  });
+
+  it("keeps category migration idempotent across repeated normalization", () => {
+    const input = createStore({
+      transactions: [
+        {
+          id: "tx-3",
+          date: "2026-07-02",
+          ledger: "Consulting",
+          amount: 80,
+          type: "in",
+          category: "Consulting",
+          notes: "",
+          tags: [],
+        },
+      ],
+    });
+
+    const once = normalizeStore(input);
+    const twice = normalizeStore(once);
+
+    const consultingCategories = twice.categories.filter(
+      (category) => category.type === "in" && category.name === "Consulting"
+    );
+
+    expect(consultingCategories).toHaveLength(1);
+    expect(twice.transactions[0].category).toBe("Consulting");
+  });
 });

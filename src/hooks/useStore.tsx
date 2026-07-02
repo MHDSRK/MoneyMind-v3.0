@@ -1036,6 +1036,113 @@ function normalizeCategory(category: Partial<Category>): Category {
   });
 }
 
+function createCategoryRecord(name: string, type: TransactionType): Category {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    type,
+    deleted: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function isSystemCategory(category: Category): boolean {
+  const defaultNames = (category.type === "in"
+    ? DEFAULT_MONEY_IN_CATEGORY_NAMES
+    : DEFAULT_MONEY_OUT_CATEGORY_NAMES) as readonly string[];
+  return defaultNames.includes(category.name);
+}
+
+function getCategorySortOrder(category: Category): number {
+  const defaultNames = (category.type === "in"
+    ? DEFAULT_MONEY_IN_CATEGORY_NAMES
+    : DEFAULT_MONEY_OUT_CATEGORY_NAMES) as readonly string[];
+  const index = defaultNames.indexOf(category.name);
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
+}
+
+function sortCategoriesForRegistry(categories: Category[]): Category[] {
+  const seenByType = new Map<TransactionType, Set<string>>();
+  const uniqueCategories: Category[] = [];
+
+  for (const category of categories) {
+    const normalizedCategory = normalizeCategory(category);
+    const normalizedType = normalizeTransactionType(normalizedCategory.type);
+    const categoryKey = normalizedCategory.name.trim().toLowerCase();
+
+    if (!categoryKey) continue;
+
+    const seenNames = seenByType.get(normalizedType) ?? new Set<string>();
+    if (seenNames.has(categoryKey)) continue;
+
+    seenNames.add(categoryKey);
+    seenByType.set(normalizedType, seenNames);
+    uniqueCategories.push(normalizedCategory);
+  }
+
+  const systemCategories = uniqueCategories
+    .filter((category) => isSystemCategory(category))
+    .sort((left, right) => getCategorySortOrder(left) - getCategorySortOrder(right));
+
+  const customCategories = uniqueCategories
+    .filter((category) => !isSystemCategory(category))
+    .sort((left, right) => {
+      const leftTime = left.createdAt ?? "";
+      const rightTime = right.createdAt ?? "";
+      return leftTime.localeCompare(rightTime);
+    });
+
+  return [...systemCategories, ...customCategories];
+}
+
+function ensureCategoriesForTransactions(store: Store, transactions: Transaction[]): Store {
+  const nextCategories = [...sortCategoriesForRegistry(store.categories)];
+  const seenByType = new Map<TransactionType, Set<string>>();
+
+  for (const category of nextCategories) {
+    const normalizedType = normalizeTransactionType(category.type);
+    const categoryKey = category.name.trim().toLowerCase();
+    if (!categoryKey) continue;
+
+    const seenNames = seenByType.get(normalizedType) ?? new Set<string>();
+    seenNames.add(categoryKey);
+    seenByType.set(normalizedType, seenNames);
+  }
+
+  const addCategoryIfMissing = (name: string, type: TransactionType) => {
+    const normalizedType = normalizeTransactionType(type);
+    const trimmedName = name.trim();
+    if (!trimmedName || normalizedType === "transfer") return;
+
+    const categoryKey = trimmedName.toLowerCase();
+    const seenNames = seenByType.get(normalizedType) ?? new Set<string>();
+    if (seenNames.has(categoryKey)) return;
+
+    seenNames.add(categoryKey);
+    seenByType.set(normalizedType, seenNames);
+    nextCategories.push(createCategoryRecord(trimmedName, normalizedType));
+  };
+
+  for (const name of DEFAULT_MONEY_IN_CATEGORY_NAMES) {
+    addCategoryIfMissing(name, "in");
+  }
+
+  for (const name of DEFAULT_MONEY_OUT_CATEGORY_NAMES) {
+    addCategoryIfMissing(name, "out");
+  }
+
+  for (const transaction of transactions) {
+    if (transaction.type !== "in" && transaction.type !== "out") continue;
+    addCategoryIfMissing(transaction.category, transaction.type);
+  }
+
+  return {
+    ...store,
+    categories: sortCategoriesForRegistry(nextCategories),
+  };
+}
+
 export function addCustomCategory(store: Store, name: string, type: TransactionType): Store {
   const trimmedName = name.trim();
   if (!trimmedName) return store;
@@ -1051,33 +1158,41 @@ export function addCustomCategory(store: Store, name: string, type: TransactionT
 
   return {
     ...store,
-    categories: [
+    categories: sortCategoriesForRegistry([
       ...store.categories,
-      {
-        id: crypto.randomUUID(),
-        name: trimmedName,
-        type,
-        deleted: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ],
+      createCategoryRecord(trimmedName, type),
+    ]),
   };
 }
 
 export function normalizeStore(parsed: Partial<Store>): Store {
   const accounts = (parsed.accounts ?? INITIAL_DATA.accounts).map(normalizeAccount);
+  const transactions = (parsed.transactions ?? []).map((transaction) => normalizeTransaction(transaction, accounts));
+  const initialCategories = (parsed.categories && parsed.categories.length > 0 ? parsed.categories : INITIAL_DATA.categories).map(normalizeCategory);
+  const withCategoryRegistry = ensureCategoriesForTransactions(
+    {
+      ...INITIAL_DATA,
+      ...parsed,
+      transactions,
+      accounts,
+      creditCards: (parsed.creditCards ?? INITIAL_DATA.creditCards).map(normalizeCreditCard),
+      loans: (parsed.loans ?? INITIAL_DATA.loans).map(normalizeLoan),
+      liabilities: (parsed.liabilities ?? INITIAL_DATA.liabilities).map(normalizeLiability),
+      lends: (parsed.lends ?? []).map(normalizeLendItem),
+      categories: initialCategories,
+      history: (parsed.history ?? INITIAL_DATA.history).map(normalizeHistoryEvent),
+    },
+    transactions
+  );
 
   return {
-    ...INITIAL_DATA,
-    ...parsed,
-    transactions: (parsed.transactions ?? []).map((transaction) => normalizeTransaction(transaction, accounts)),
+    ...withCategoryRegistry,
+    transactions,
     accounts,
     creditCards: (parsed.creditCards ?? INITIAL_DATA.creditCards).map(normalizeCreditCard),
     loans: (parsed.loans ?? INITIAL_DATA.loans).map(normalizeLoan),
     liabilities: (parsed.liabilities ?? INITIAL_DATA.liabilities).map(normalizeLiability),
     lends: (parsed.lends ?? []).map(normalizeLendItem),
-    categories: (parsed.categories ?? INITIAL_DATA.categories).map(normalizeCategory),
     history: (parsed.history ?? INITIAL_DATA.history).map(normalizeHistoryEvent),
   };
 }
