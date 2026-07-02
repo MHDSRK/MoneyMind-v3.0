@@ -3,6 +3,29 @@ import { Button } from "@/components/ui/button";
 import { type ReactNode, useEffect, useState } from "react";
 import { formatDisplayDate } from "@/utils/date";
 
+/**
+ * StandardizedDatePicker Implementation (EditDialog)
+ * 
+ * This is the SINGLE reusable date picker used throughout MoneyMind for all editable date fields:
+ * - Credit Card: Due Date, Next Bill Date
+ * - Loans: Next EMI Date
+ * - Liabilities: Due Date (Regular Expenses, Chitty, Borrow, More Liabilities)
+ * 
+ * Key Features:
+ * - Uses native HTML5 <input type="date"> with browser's built-in calendar picker
+ * - Consistent behavior across desktop, iOS, and Android
+ * - ReadOnly attribute prevents manual text entry - only calendar selection allowed
+ * - showPicker() method opens calendar immediately on focus
+ * - Prevents paste operations to ensure calendar is the only input method
+ * - Dates stored in YYYY-MM-DD format (ISO date without time)
+ * - Dates displayed as DD/MMM/YYYY via formatDisplayDate()
+ * 
+ * Platform Support:
+ * - Desktop (Chrome, Firefox, Safari, Edge): Native calendar picker
+ * - iOS: Native iOS date wheel picker
+ * - Android: Native Android date picker
+ */
+
 interface EditDialogProps {
   open: boolean;
   title: string;
@@ -38,6 +61,8 @@ export function EditDialog({
       return;
     }
 
+    // Standardized date picker: Open native calendar picker on focus
+    // Works consistently on desktop and mobile (iOS and Android)
     event.currentTarget.showPicker?.();
   };
 
@@ -95,6 +120,11 @@ export function EditDialog({
               }
             }}
             className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            // Standardized date picker settings:
+            // - readOnly: Forces calendar picker only, no manual text entry
+            // - type="date": Uses native HTML5 date input with built-in picker
+            // - showPicker(): Triggered on focus to open calendar immediately
+            // - paste prevented: Ensures calendar is the only input method
           />
         </div>
 

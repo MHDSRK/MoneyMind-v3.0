@@ -8,6 +8,27 @@ import { isTrackingAccount } from "@/lib/calculations";
 import { toast } from "@/hooks/use-toast";
 import { formatDisplayDate } from "@/utils/date";
 
+/**
+ * EditPage: Unified Editor for All Master Records
+ * 
+ * Standardized Date Picker Flow:
+ * 1. User clicks "Edit" on any date field (Due Date, Next Bill Date, Next EMI)
+ * 2. openEditDialog() is called with the field name and current value
+ * 3. normalizeDialogValue() converts ISO format dates to YYYY-MM-DD
+ * 4. getDialogInputType() identifies the field as a date field
+ * 5. EditDialog opens with type="date", triggering native calendar picker
+ * 6. User selects date from calendar picker
+ * 7. handleDialogSave() saves the YYYY-MM-DD value
+ * 8. formatDisplayDate() displays the date as DD/MMM/YYYY in the UI
+ * 
+ * All Date Fields Using This Standardized Implementation:
+ * - Credit Card: Due Date, Next Bill Date
+ * - Loan: Next EMI Date
+ * - Liabilities: Due Date (all groups)
+ * 
+ * This ensures consistent, mobile-friendly date selection across the application.
+ */
+
 type EditableEntity =
   | { type: "account"; item: Account }
   | { type: "credit-card"; item: CreditCard }
@@ -324,17 +345,36 @@ export function EditPage() {
   };
 
   const getDialogInputType = (entity?: EditableEntity, field?: string) => {
+    // Standardized date picker configuration:
+    // All date fields use the same native HTML5 date input implementation
+    // This ensures consistent behavior across desktop and mobile platforms
+    
+    // Credit Cards, Loans, and Liabilities all use this unified date picker
     if (field === 'Next Bill Date' || field === 'Next EMI') return 'date';
     if (field === 'Due Date' && entity?.type === 'liability') return 'date';
     if (field === 'Due Date' && entity?.type === 'credit-card') return 'date';
+    
+    // Numeric fields for financial data
     if (field === 'Credit Limit' || field === 'Outstanding' || field === 'Unbilled' || field === 'Balance' || field === 'Total Loan' || field === 'Outstanding Balance' || field === 'EMI / Month' || field === 'Amount' || field === 'Remaining Months') return 'number';
+    
+    // Default to text for other fields
     return 'text';
   };
 
   const normalizeDialogValue = (entity: EditableEntity | undefined, field: string | undefined, currentValue: string) => {
     if (!entity || !field) return currentValue;
-    if ((field === 'Next Bill Date' || field === 'Next EMI' || (field === 'Due Date' && (entity.type === 'liability' || entity.type === 'credit-card'))) && currentValue) {
-      return currentValue.split('T')[0];
+    // Standardized date picker: normalize all date fields to YYYY-MM-DD format
+    // This ensures consistent date input format across all date pickers (desktop and mobile)
+    const isDateField = (
+      field === 'Next Bill Date' || 
+      field === 'Next EMI' || 
+      (field === 'Due Date' && (entity.type === 'liability' || entity.type === 'credit-card'))
+    );
+    
+    if (isDateField && currentValue) {
+      // Handle both ISO format (with T) and YYYY-MM-DD format
+      const datePart = currentValue.split('T')[0];
+      return datePart;
     }
     return currentValue;
   };
@@ -371,7 +411,7 @@ export function EditPage() {
           <EditableField label="Outstanding" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding', entity.item.outstanding.toString(), 'Edit outstanding amount')} />
           <EditableField label="Unbilled" value={formatCurrency(entity.item.unbilled ?? 0)} onEdit={() => openEditDialog(entity, 'Unbilled', String(entity.item.unbilled ?? 0), 'Edit unbilled amount')} />
           <EditableField label="Due Date" value={formatDisplayDate(entity.item.dueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Due Date', entity.item.dueDate || '', 'Edit due date')} />
-          <EditableField label="Next Bill Date" value={formatDisplayDate(entity.item.nextDueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Next Bill Date', entity.item.nextDueDate ? entity.item.nextDueDate.split('T')[0] : '', 'Edit next bill date')} />
+          <EditableField label="Next Bill Date" value={formatDisplayDate(entity.item.nextDueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Next Bill Date', entity.item.nextDueDate || '', 'Edit next bill date')} />
         </EditAccordion>
       );
     }
