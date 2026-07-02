@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { useStore, Transaction, TransactionType } from "@/hooks/useStore";
+import {
+  useStore,
+  Transaction,
+  TransactionType,
+  DEFAULT_MONEY_IN_CATEGORY_NAMES,
+  DEFAULT_MONEY_OUT_CATEGORY_NAMES,
+  addCustomCategory,
+} from "@/hooks/useStore";
 import { calculateMetrics, getUpcomingDues } from "@/lib/calculations";
 import { createTransaction } from "@/lib/transactionEffects";
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarClock } from "lucide-react";
@@ -27,6 +34,8 @@ export function HomeTab() {
   const [toAccountId, setToAccountId] = useState("");
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   // Calculate all financial metrics, excluding tracking-only items.
   const financialMetrics = calculateMetrics(store);
@@ -94,6 +103,8 @@ export function HomeTab() {
     setCategory("");
     setNotes("");
     setSelectedTags([]);
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
     setTxType(null);
     setSheetOpen(false);
     toast({ title: "Transaction saved", description: "Your update was recorded instantly." });
@@ -119,6 +130,20 @@ export function HomeTab() {
   const moneyOutCategories = store.categories
     .filter((c) => c.type === "out" && !c.deleted)
     .map((c) => c.name);
+
+  const sortedMoneyInCategories = [
+    ...DEFAULT_MONEY_IN_CATEGORY_NAMES.filter((name) => moneyInCategories.includes(name)),
+    ...moneyInCategories
+      .filter((name) => !DEFAULT_MONEY_IN_CATEGORY_NAMES.includes(name))
+      .sort((a, b) => a.localeCompare(b)),
+  ];
+
+  const sortedMoneyOutCategories = [
+    ...DEFAULT_MONEY_OUT_CATEGORY_NAMES.filter((name) => moneyOutCategories.includes(name)),
+    ...moneyOutCategories
+      .filter((name) => !DEFAULT_MONEY_OUT_CATEGORY_NAMES.includes(name))
+      .sort((a, b) => a.localeCompare(b)),
+  ];
 
   const moneyInSelect = (
     <select
@@ -502,8 +527,8 @@ export function HomeTab() {
                   </label>
                   <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                     {(txType === "in"
-                      ? moneyInCategories
-                      : moneyOutCategories
+                      ? sortedMoneyInCategories
+                      : sortedMoneyOutCategories
                     ).map((cat) => (
                       <button
                         key={cat}
@@ -512,13 +537,72 @@ export function HomeTab() {
                           "px-3 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap shrink-0 transition-all",
                           category === cat
                             ? "bg-primary text-primary-foreground border-primary shadow-[0_0_8px_rgba(34,211,238,0.4)]"
-                            : "border-white/10 bg-black/20 text-muted-foreground hover:bg-white/5"
+                            : "border-white/10 bg-black/20 text-muted-foreground hover:bg-white/5",
                         )}
                       >
                         {cat}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCategoryInput(true)}
+                      className="px-3 py-1.5 rounded-full border border-dashed border-white/30 text-xs font-medium text-muted-foreground bg-transparent hover:bg-white/5 shrink-0"
+                    >
+                      +
+                    </button>
                   </div>
+
+                  {showNewCategoryInput && (
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="New category name"
+                        className="flex-1 bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmedName = newCategoryName.trim();
+                          if (!trimmedName) {
+                            toast({ title: "Enter a category name", variant: "destructive" });
+                            return;
+                          }
+
+                          const existingCategory = store.categories.some(
+                            (categoryItem) =>
+                              !categoryItem.deleted &&
+                              categoryItem.type === txType &&
+                              categoryItem.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+                          );
+
+                          if (existingCategory) {
+                            toast({ title: "Category already exists", variant: "destructive" });
+                            return;
+                          }
+
+                          updateStore((prev) => addCustomCategory(prev, trimmedName, txType));
+                          setCategory(trimmedName);
+                          setNewCategoryName("");
+                          setShowNewCategoryInput(false);
+                        }}
+                        className="rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewCategoryInput(false);
+                          setNewCategoryName("");
+                        }}
+                        className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-muted-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

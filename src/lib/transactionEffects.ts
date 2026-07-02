@@ -44,6 +44,160 @@ function findCardById(store: Store, cardId?: string) {
   return store.creditCards.find((card) => !card.deleted && !card.archivedAt && card.id === cardId);
 }
 
+function isLentTrackingAccount(account: Store["accounts"][number]) {
+  return Boolean(account.isTracking) || /\blent\b/i.test(account.name ?? "");
+}
+
+function findLentAccountByName(store: Store, ledger?: string) {
+  const trimmed = ledger?.trim();
+  if (!trimmed) return undefined;
+  return store.accounts.find(
+    (account) =>
+      !account.deleted &&
+      !account.archivedAt &&
+      isLentTrackingAccount(account) &&
+      account.name === trimmed,
+  );
+}
+
+function findBorrowLiabilityByName(store: Store, name?: string) {
+  const trimmed = name?.trim();
+  if (!trimmed) return undefined;
+  return store.liabilities.find(
+    (item) =>
+      !item.deleted &&
+      !item.archivedAt &&
+      item.group === "Borrow" &&
+      item.name === trimmed,
+  );
+}
+
+function applyLentExpense(store: Store, transaction: Transaction, direction: 1 | -1): Store {
+  const ledgerName = transaction.ledger?.trim();
+  if (!ledgerName) {
+    throw new Error("Lent transactions require a Ledger name.");
+  }
+
+  const existingAccount = findLentAccountByName(store, ledgerName);
+  const nextBalance = (existingAccount?.balance ?? 0) + transaction.amount * direction;
+  if (nextBalance < 0) {
+    throw new Error("Outstanding Lent balance cannot become negative.");
+  }
+
+  if (existingAccount) {
+    return {
+      ...store,
+      accounts: store.accounts.map((account) =>
+        account.id === existingAccount.id
+          ? {
+              ...account,
+              balance: nextBalance,
+              updatedAt: new Date().toISOString(),
+            }
+          : account,
+      ),
+    };
+  }
+
+  if (direction === -1) {
+    return store;
+  }
+
+  return {
+    ...store,
+    accounts: [
+      ...store.accounts,
+      {
+        id: crypto.randomUUID(),
+        name: ledgerName,
+        type: "other",
+        group: "accounts",
+        balance: transaction.amount,
+        isTracking: true,
+        deleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  };
+}
+
+function applyBorrowIncome(store: Store, transaction: Transaction, direction: 1 | -1): Store {
+  const ledgerName = transaction.ledger?.trim() || "Borrow";
+  const existingLiability = findBorrowLiabilityByName(store, ledgerName);
+  const nextAmount = (existingLiability?.amount ?? 0) + transaction.amount * direction;
+
+  if (nextAmount < 0) {
+    throw new Error("Borrow balance cannot become negative.");
+  }
+
+  if (existingLiability) {
+    return {
+      ...store,
+      liabilities: store.liabilities.map((item) =>
+        item.id === existingLiability.id
+          ? {
+              ...item,
+              amount: nextAmount,
+              updatedAt: new Date().toISOString(),
+            }
+          : item,
+      ),
+    };
+  }
+
+  if (direction === -1) {
+    throw new Error("Borrow record not found to reverse.");
+  }
+
+  return {
+    ...store,
+    liabilities: [
+      ...store.liabilities,
+      {
+        id: crypto.randomUUID(),
+        group: "Borrow",
+        name: ledgerName,
+        amount: transaction.amount,
+        dueDate: "",
+        deleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  };
+}
+
+function applyLentPayBack(store: Store, transaction: Transaction, direction: 1 | -1): Store {
+  const ledgerName = transaction.ledger?.trim();
+  if (!ledgerName) {
+    throw new Error("Lent Pay Back transactions require a Ledger name.");
+  }
+
+  const existingAccount = findLentAccountByName(store, ledgerName);
+  if (!existingAccount) {
+    throw new Error("No matching Lent account found.");
+  }
+
+  const nextBalance = existingAccount.balance - transaction.amount * direction;
+  if (nextBalance < 0) {
+    throw new Error("Outstanding Lent balance cannot become negative.");
+  }
+
+  return {
+    ...store,
+    accounts: store.accounts.map((account) =>
+      account.id === existingAccount.id
+        ? {
+            ...account,
+            balance: nextBalance,
+            updatedAt: new Date().toISOString(),
+          }
+        : account,
+    ),
+  };
+}
+
 export function applyTransactionEffects(
   store: Store,
   transaction: Partial<Transaction>,
@@ -200,6 +354,14 @@ export function applyTransactionEffects(
       throw new Error("Money In requires a valid destination account or card");
     }
 
+    if (normalizedTransaction.category === "Borrow") {
+      nextStore = applyBorrowIncome(nextStore, normalizedTransaction, direction);
+    }
+
+    if (normalizedTransaction.category === "Lent Pay Back") {
+      nextStore = applyLentPayBack(nextStore, normalizedTransaction, direction);
+    }
+
     if (destinationAccount) {
       nextStore = {
         ...nextStore,
@@ -229,6 +391,10 @@ export function applyTransactionEffects(
         }),
       };
     }
+  }
+
+  if (normalizedTransaction.type === "out" && normalizedTransaction.category === "Lent") {
+    nextStore = applyLentExpense(nextStore, normalizedTransaction, direction);
   }
 
   return nextStore;

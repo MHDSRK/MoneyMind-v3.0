@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as backupService from "@/lib/backupService";
-import { createTransaction } from "@/lib/transactionEffects";
+import { applyTransactionEffects, createTransaction } from "@/lib/transactionEffects";
 import { addMonths, parseISO } from "date-fns";
 
 export type TransactionType = "in" | "out" | "transfer";
@@ -169,6 +169,24 @@ export interface Store {
   history: HistoryEvent[];
 }
 
+export const DEFAULT_MONEY_IN_CATEGORY_NAMES = [
+  "Income",
+  "Borrow",
+  "Business",
+  "Lent Pay Back",
+  "Others",
+] as const;
+
+export const DEFAULT_MONEY_OUT_CATEGORY_NAMES = [
+  "Home Build",
+  "Lent",
+  "Business",
+  "Personal",
+  "Travel",
+  "Medicine",
+  "Others",
+] as const;
+
 const INITIAL_DATA: Store = {
   transactions: [],
   accounts: [
@@ -298,18 +316,16 @@ const INITIAL_DATA: Store = {
   categories: [
     { id: "income", name: "Income", type: "in" },
     { id: "borrow", name: "Borrow", type: "in" },
-    { id: "repayment-in", name: "Repayment", type: "in" },
-    { id: "company-in", name: "Company", type: "in" },
-    { id: "home-expenses", name: "Home Expenses", type: "out" },
+    { id: "business-in", name: "Business", type: "in" },
+    { id: "lent-pay-back", name: "Lent Pay Back", type: "in" },
+    { id: "others-in", name: "Others", type: "in" },
+    { id: "home-build", name: "Home Build", type: "out" },
     { id: "lent", name: "Lent", type: "out" },
-    { id: "repayment-out", name: "Repayment", type: "out" },
-    { id: "company-out", name: "Company", type: "out" },
-    { id: "business", name: "Business", type: "out" },
+    { id: "business-out", name: "Business", type: "out" },
     { id: "personal", name: "Personal", type: "out" },
-    { id: "tax", name: "Tax", type: "out" },
     { id: "travel", name: "Travel", type: "out" },
-    { id: "medical", name: "Medical", type: "out" },
-    { id: "others", name: "Others", type: "out" },
+    { id: "medicine", name: "Medicine", type: "out" },
+    { id: "others-out", name: "Others", type: "out" },
   ],
   history: [],
 };
@@ -1018,6 +1034,35 @@ function normalizeCategory(category: Partial<Category>): Category {
     createdAt: category.createdAt,
     updatedAt: category.updatedAt,
   });
+}
+
+export function addCustomCategory(store: Store, name: string, type: TransactionType): Store {
+  const trimmedName = name.trim();
+  if (!trimmedName) return store;
+
+  const existingCategory = store.categories.some(
+    (category) =>
+      !category.deleted &&
+      category.type === type &&
+      category.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+  );
+
+  if (existingCategory) return store;
+
+  return {
+    ...store,
+    categories: [
+      ...store.categories,
+      {
+        id: crypto.randomUUID(),
+        name: trimmedName,
+        type,
+        deleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  };
 }
 
 export function normalizeStore(parsed: Partial<Store>): Store {
