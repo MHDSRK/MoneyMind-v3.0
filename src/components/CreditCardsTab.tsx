@@ -93,16 +93,7 @@ export function CreditCardsTab() {
   const cardAvailable = (card: CreditCard) => Math.max(0, getCreditCardAvailableAmount(card));
   const cardDueAmount = (card: CreditCard) => getCreditCardDueAmount(card);
   const formatDueDate = (dateString?: string) => {
-    if (!dateString) return "Not set";
-    const parsed = new Date(dateString);
-    if (Number.isNaN(parsed.getTime())) return "Not set";
-    return parsed
-      .toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      })
-      .replace(/ /g, "/");
+    return formatDisplayDate(dateString, "Not set");
   };
 
   return (
@@ -148,7 +139,7 @@ export function CreditCardsTab() {
                   </div>
                   <div className="rounded-2xl bg-white/5 p-3 text-center">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Due Date</p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">{formatDueDate(card.nextDueDate)}</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{formatDisplayDate(card.dueDate, 'Not set')}</p>
                   </div>
                   <div className="rounded-2xl bg-white/5 p-3 text-center">
                     <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Unbilled</p>

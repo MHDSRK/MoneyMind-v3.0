@@ -70,7 +70,8 @@ export interface CreditCard {
   outstanding: number;
   unbilled?: number;
   statementDate: number;
-  dueDate: number;
+  // Due date stored as full ISO date string (YYYY-MM-DD). Use calendar picker for edits.
+  dueDate: string;
   nextDueDate: string;
   createdAt?: string;
   updatedAt?: string;
@@ -186,7 +187,7 @@ const INITIAL_DATA: Store = {
       creditLimit: 0,
       outstanding: 0,
       statementDate: 1,
-      dueDate: 20,
+      dueDate: "",
       nextDueDate: "",
     },
     {
@@ -196,7 +197,7 @@ const INITIAL_DATA: Store = {
       creditLimit: 0,
       outstanding: 0,
       statementDate: 1,
-      dueDate: 20,
+      dueDate: "",
       nextDueDate: "",
     },
     {
@@ -206,7 +207,7 @@ const INITIAL_DATA: Store = {
       creditLimit: 0,
       outstanding: 0,
       statementDate: 1,
-      dueDate: 20,
+      dueDate: "",
       nextDueDate: "",
     },
     {
@@ -216,7 +217,7 @@ const INITIAL_DATA: Store = {
       creditLimit: 0,
       outstanding: 0,
       statementDate: 1,
-      dueDate: 20,
+      dueDate: "",
       nextDueDate: "",
     },
   ],
@@ -955,7 +956,7 @@ function normalizeCreditCard(card: Partial<CreditCard>): CreditCard {
     outstanding: card.outstanding ?? 0,
     unbilled: card.unbilled ?? 0,
     statementDate: card.statementDate ?? 1,
-    dueDate: card.dueDate ?? 15,
+    dueDate: card.dueDate ?? "",
     nextDueDate: card.nextDueDate ?? new Date().toISOString(),
     createdAt: card.createdAt,
     updatedAt: card.updatedAt,

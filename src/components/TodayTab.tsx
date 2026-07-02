@@ -226,7 +226,7 @@ export function TodayTab() {
                   }}
                   className="flex items-center px-3 py-3 gap-3 w-full text-left hover:bg-white/5 transition-colors"
                 >
-                  <div className="flex-1 min-w-[15ch] min-h-[3rem] flex flex-col justify-center">
+                  <div className="flex-1 min-w-0 min-h-[3rem] flex flex-col justify-center overflow-hidden">
                     <p className="truncate text-sm font-semibold text-white">
                       {tx.type === "transfer"
                         ? `Self Transfer : ${formatCurrency(tx.amount)}`
@@ -247,12 +247,19 @@ export function TodayTab() {
                     </p>
                   </div>
 
-                  <div className="w-24 text-right text-sm font-semibold">
-                    <span className={cn(
-                      tx.type === "in" ? "text-emerald-400" : tx.type === "out" ? "text-destructive" : "text-foreground",
-                    )}>
-                      {tx.type === "in" ? formatCurrency(tx.amount) : tx.type === "out" ? formatCurrency(tx.amount) : formatCurrency(0)}
-                    </span>
+                  <div className="w-24 flex-shrink-0 text-right text-sm font-semibold">
+                    {tx.type === "in" ? (
+                      <span className="text-emerald-400 whitespace-nowrap">{formatCurrency(tx.amount)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">{""}</span>
+                    )}
+                  </div>
+                  <div className="w-24 flex-shrink-0 text-right text-sm font-semibold">
+                    {tx.type === "out" ? (
+                      <span className="text-destructive whitespace-nowrap">{formatCurrency(tx.amount)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">{""}</span>
+                    )}
                   </div>
                 </div>
               </SwipeableArchiveCard>

@@ -37,6 +37,7 @@ export function HomeTab() {
   const upcomingDues = getUpcomingDues(store);
   const [payOpenId, setPayOpenId] = useState<string | null>(null);
   const [payFromAccountId, setPayFromAccountId] = useState<string>("");
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
 
   const handleSave = () => {
     if (!amount || !ledger || !category || !txType) return;
@@ -235,7 +236,25 @@ export function HomeTab() {
           <div className="divide-y divide-white/5">
             {upcomingDues.map((due) => (
               <div key={due.id}>
-                <SwipeableListItem actionLabel="Mark as Paid" onAction={() => setPayOpenId(due.id)}>
+                <SwipeableListItem
+                  actionLabel="Mark as Paid"
+                  isOpen={openRowId === due.id}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setOpenRowId(due.id);
+                      // ensure only one row open at a time
+                      setPayOpenId(null);
+                    } else if (openRowId === due.id) {
+                      setOpenRowId(null);
+                      setPayOpenId(null);
+                    }
+                  }}
+                  onAction={() => {
+                    // action button tapped - open account selector for this row
+                    setPayOpenId(due.id);
+                    setOpenRowId(due.id);
+                  }}
+                >
                   <div className="flex items-center px-4 py-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{due.name}</p>
@@ -255,7 +274,7 @@ export function HomeTab() {
                   </div>
                 </SwipeableListItem>
 
-                {payOpenId === due.id ? (
+                {payOpenId === due.id && openRowId === due.id ? (
                   <div className="px-4 pb-3 pt-2 bg-black/10 border-b border-white/5">
                     <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Select Account</p>
                     <select
@@ -305,6 +324,7 @@ export function HomeTab() {
                           toast({ title: "Payment recorded", description: `${formatCurrency(amt)} paid.` });
                           setPayOpenId(null);
                           setPayFromAccountId("");
+                          setOpenRowId(null);
                         }}
                         className="flex-1 bg-primary text-primary-foreground py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-all"
                       >
@@ -314,6 +334,7 @@ export function HomeTab() {
                         onClick={() => {
                           setPayOpenId(null);
                           setPayFromAccountId("");
+                          setOpenRowId(null);
                         }}
                         className="px-4 bg-white/10 text-muted-foreground py-2 rounded-xl text-sm font-bold hover:bg-white/20 transition-all"
                       >

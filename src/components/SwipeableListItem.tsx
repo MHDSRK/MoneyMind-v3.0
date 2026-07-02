@@ -7,6 +7,10 @@ interface SwipeableListItemProps {
   onAction: () => void;
   className?: string;
   actionClassName?: string;
+  /** Controlled open state: when provided, component follows this state */
+  isOpen?: boolean;
+  /** Called when open state changes due to user interaction */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function SwipeableListItem({
@@ -15,6 +19,8 @@ export function SwipeableListItem({
   onAction,
   className,
   actionClassName,
+  isOpen: controlledIsOpen,
+  onOpenChange,
 }: SwipeableListItemProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const startXRef = useRef(0);
@@ -62,6 +68,7 @@ export function SwipeableListItem({
   const finalizeSwipe = () => {
     const shouldOpen = offset <= -threshold;
     setIsOpen(shouldOpen);
+    if (onOpenChange) onOpenChange(shouldOpen);
     setOffset(shouldOpen ? -actionWidth : 0);
     currentOffsetRef.current = shouldOpen ? -actionWidth : 0;
     setIsDragging(false);
@@ -82,8 +89,17 @@ export function SwipeableListItem({
 
   const handleAction = () => {
     onAction();
-    setIsOpen(false);
   };
+
+  // Sync controlled prop -> internal state
+  useEffect(() => {
+    if (typeof controlledIsOpen === "boolean") {
+      setIsOpen(controlledIsOpen);
+      setOffset(controlledIsOpen ? -actionWidth : 0);
+      currentOffsetRef.current = controlledIsOpen ? -actionWidth : 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlledIsOpen]);
 
   return (
     <div

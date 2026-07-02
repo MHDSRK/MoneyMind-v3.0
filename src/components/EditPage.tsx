@@ -26,10 +26,13 @@ interface DialogConfig {
 function groupRecords(store: ReturnType<typeof useStore>['store'], query: string) {
   const normalized = query.trim().toLowerCase();
   const filterName = (name: string) => !normalized || name.toLowerCase().includes(normalized);
-
-  const assets = store.accounts.filter(
-    (item) => !item.deleted && !item.archivedAt && ['cash', 'bank', 'business'].includes(item.type ?? '') && !isTrackingAccount(item) && filterName(item.name)
+  const bankCash = store.accounts.filter(
+    (item) => !item.deleted && !item.archivedAt && ['cash', 'bank'].includes(item.type ?? '') && !isTrackingAccount(item) && filterName(item.name)
   );
+  const business = store.accounts.filter(
+    (item) => !item.deleted && !item.archivedAt && item.type === 'business' && !isTrackingAccount(item) && filterName(item.name)
+  );
+
   const investments = store.accounts.filter(
     (item) => !item.deleted && !item.archivedAt && item.type === 'investments' && !isTrackingAccount(item) && filterName(item.name)
   );
@@ -58,7 +61,7 @@ function groupRecords(store: ReturnType<typeof useStore>['store'], query: string
     (item) => !item.deleted && !item.archivedAt && item.group === 'More Liabilities' && filterName(item.name)
   );
 
-  return { assets, investments, insurance, lent, creditCards, loans, regularExpenses, borrowed, chitty, moreLiabilities };
+  return { bankCash, business, investments, insurance, lent, creditCards, loans, regularExpenses, borrowed, chitty, moreLiabilities };
 }
 
 export function EditPage() {
@@ -148,7 +151,7 @@ export function EditPage() {
           outstanding: 0,
           unbilled: 0,
           statementDate: 1,
-          dueDate: 15,
+          dueDate: new Date().toISOString().split("T")[0],
           nextDueDate: new Date().toISOString(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -251,7 +254,7 @@ export function EditPage() {
             change.unbilled = Number.isFinite(parsedNumber) ? parsedNumber : entity.item.unbilled ?? 0;
             break;
           case 'Due Date':
-            change.dueDate = Number.isFinite(parsedNumber) ? parsedNumber : entity.item.dueDate;
+            change.dueDate = value;
             break;
           case 'Next Bill Date':
             change.nextDueDate = value;
@@ -323,14 +326,14 @@ export function EditPage() {
   const getDialogInputType = (entity?: EditableEntity, field?: string) => {
     if (field === 'Next Bill Date' || field === 'Next EMI') return 'date';
     if (field === 'Due Date' && entity?.type === 'liability') return 'date';
-    if (field === 'Due Date' && entity?.type === 'credit-card') return 'number';
+    if (field === 'Due Date' && entity?.type === 'credit-card') return 'date';
     if (field === 'Credit Limit' || field === 'Outstanding' || field === 'Unbilled' || field === 'Balance' || field === 'Total Loan' || field === 'Outstanding Balance' || field === 'EMI / Month' || field === 'Amount' || field === 'Remaining Months') return 'number';
     return 'text';
   };
 
   const normalizeDialogValue = (entity: EditableEntity | undefined, field: string | undefined, currentValue: string) => {
     if (!entity || !field) return currentValue;
-    if ((field === 'Next Bill Date' || field === 'Next EMI' || (field === 'Due Date' && entity.type === 'liability')) && currentValue) {
+    if ((field === 'Next Bill Date' || field === 'Next EMI' || (field === 'Due Date' && (entity.type === 'liability' || entity.type === 'credit-card'))) && currentValue) {
       return currentValue.split('T')[0];
     }
     return currentValue;
@@ -367,7 +370,7 @@ export function EditPage() {
           <EditableField label="Credit Limit" value={formatCurrency(entity.item.creditLimit)} onEdit={() => openEditDialog(entity, 'Credit Limit', entity.item.creditLimit.toString(), 'Edit credit limit')} />
           <EditableField label="Outstanding" value={formatCurrency(entity.item.outstanding)} onEdit={() => openEditDialog(entity, 'Outstanding', entity.item.outstanding.toString(), 'Edit outstanding amount')} />
           <EditableField label="Unbilled" value={formatCurrency(entity.item.unbilled ?? 0)} onEdit={() => openEditDialog(entity, 'Unbilled', String(entity.item.unbilled ?? 0), 'Edit unbilled amount')} />
-          <EditableField label="Due Date" value={String(entity.item.dueDate)} onEdit={() => openEditDialog(entity, 'Due Date', String(entity.item.dueDate), 'Edit due date')} />
+          <EditableField label="Due Date" value={formatDisplayDate(entity.item.dueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Due Date', entity.item.dueDate || '', 'Edit due date')} />
           <EditableField label="Next Bill Date" value={formatDisplayDate(entity.item.nextDueDate, 'Not set')} onEdit={() => openEditDialog(entity, 'Next Bill Date', entity.item.nextDueDate ? entity.item.nextDueDate.split('T')[0] : '', 'Edit next bill date')} />
         </EditAccordion>
       );
@@ -432,9 +435,9 @@ export function EditPage() {
 
       <div className="space-y-6">
         <EditAccordion
-          label="Assets"
-          isOpen={expandedCategory === "assets"}
-          onToggle={() => setExpandedCategory((prev) => (prev === "assets" ? null : "assets"))}
+          label="Bank & Cash"
+          isOpen={expandedCategory === "bankCash"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "bankCash" ? null : "bankCash"))}
         >
           <div className="space-y-2 px-4 pb-4 pt-2">
             <button
@@ -442,12 +445,33 @@ export function EditPage() {
               onClick={() => createAccount("cash")}
               className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-white/10"
             >
-              Add Asset
+              Add Account
             </button>
-            {groups.assets.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No assets found.</div>
+            {groups.bankCash.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No bank or cash accounts found.</div>
             ) : (
-              groups.assets.map((item) => renderRecord({ type: 'account', item }))
+              groups.bankCash.map((item) => renderRecord({ type: 'account', item }))
+            )}
+          </div>
+        </EditAccordion>
+
+        <EditAccordion
+          label="Business"
+          isOpen={expandedCategory === "business"}
+          onToggle={() => setExpandedCategory((prev) => (prev === "business" ? null : "business"))}
+        >
+          <div className="space-y-2 px-4 pb-4 pt-2">
+            <button
+              type="button"
+              onClick={() => createAccount("business")}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-white/10"
+            >
+              Add Business
+            </button>
+            {groups.business.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">No business accounts found.</div>
+            ) : (
+              groups.business.map((item) => renderRecord({ type: 'account', item }))
             )}
           </div>
         </EditAccordion>
