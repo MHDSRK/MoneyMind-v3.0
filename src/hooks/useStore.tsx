@@ -923,6 +923,8 @@ function normalizeTransaction(transaction: Partial<Transaction>, accounts: Accou
     toAccount: transaction.toAccount,
     toAccountId: normalizedToAccountId,
     toCardId: normalizedToCardId,
+    relatedEntityType: (transaction as any).relatedEntityType,
+    relatedEntityId: (transaction as any).relatedEntityId,
     transferResolution,
     notes: transaction.notes ?? "",
     tags: transaction.tags ?? [],
@@ -1234,13 +1236,26 @@ export function processUpcomingDuePayment(
 
   const entityLabel = entityType === "loan" ? "Loan" : entityType === "credit-card" ? "Card" : "Liability";
 
+  // Resolve a human-friendly entity name for ledger entries (prefer the entity's display name)
+  let entityNameForLedger = entityId;
+  if (entityType === "credit-card") {
+    const card = store.creditCards.find((c) => c.id === entityId);
+    if (card) entityNameForLedger = card.name || card.provider || entityId;
+  } else if (entityType === "loan") {
+    const loan = store.loans.find((l) => l.id === entityId);
+    if (loan) entityNameForLedger = loan.name || entityId;
+  } else if (entityType === "liability") {
+    const li = store.liabilities.find((l) => l.id === entityId);
+    if (li) entityNameForLedger = li.name || entityId;
+  }
+
   // Record the payment transaction (outgoing from selected account)
   const tx = {
     id: crypto.randomUUID(),
     date: payDate,
     type: "out",
     amount,
-    ledger: `${entityLabel} Payment: ${entityId}`,
+    ledger: `${entityLabel} Payment: ${entityNameForLedger}`,
     category: entityType === "loan" ? "Loan Payment" : entityType === "credit-card" ? "Credit Card Payment" : "Liability Payment",
     fromAccount: fromAccount.name,
     fromAccountId: fromAccount.id,

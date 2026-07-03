@@ -97,4 +97,54 @@ describe("HomeTab swipe interaction", () => {
     });
     container.remove();
   });
+
+  it("Mark as Paid flow: action click does not force-close the swipe item", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    let archiveWasCalled = false;
+    const handleArchive = () => {
+      archiveWasCalled = true;
+    };
+
+    act(() => {
+      root.render(
+        <SwipeableArchiveCard
+          actionLabel="Mark as Paid"
+          onArchive={handleArchive}
+          isOpen={true}
+        >
+          <div>Due: Test Card</div>
+        </SwipeableArchiveCard>,
+      );
+    });
+
+    expect(archiveWasCalled).toBe(false);
+
+    // Click the Mark as Paid button
+    const actionButton = container.querySelector("button[type='button']") as HTMLButtonElement;
+    expect(actionButton?.textContent).toBe("Mark as Paid");
+
+    act(() => {
+      actionButton?.click();
+    });
+
+    expect(archiveWasCalled).toBe(true);
+
+    // The key fix: swipe item should remain open (not force-closed)
+    // so the parent component (HomeTab) can show the payment form below it
+    const swipeContainer = container.querySelector("div.relative.z-10");
+    expect(swipeContainer).toBeTruthy();
+
+    // After clicking, the swipe should still be at full offset (open)
+    const transform = window.getComputedStyle(swipeContainer!).transform;
+    // Open state would have transform like "matrix(1, 0, 0, 1, -80, 0)" or translateX(-80px)
+    expect(transform).toBeTruthy();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
 });

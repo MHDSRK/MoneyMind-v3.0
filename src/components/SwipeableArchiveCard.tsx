@@ -93,9 +93,12 @@ export function SwipeableArchiveCard({
   };
 
   const handleAction = () => {
+    // Invoke the archive/action handler but don't force-close the swipe here.
+    // The parent controls `isOpen`/`onOpenChange` and may want to keep the
+    // row open to present follow-up UI (e.g. payment options). Closing here
+    // caused the parent to receive a conflicting state update and prevented
+    // follow-up actions from appearing.
     onArchive();
-    setInternalIsOpen(false);
-    onOpenChange?.(false);
   };
 
   return (
