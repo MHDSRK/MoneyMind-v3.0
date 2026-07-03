@@ -138,7 +138,11 @@ describe("store business rules", () => {
 
     const card = updated.creditCards.find((item) => item.id === "card-1");
     expect(card).toBeDefined();
+    // ✅ Previous unbilled becomes the new outstanding
+    expect(card?.outstanding).toBe(200);
+    // ✅ Unbilled is reset to zero
     expect(card?.unbilled).toBe(0);
+    // ✅ Dates are advanced
     expect(card?.nextDueDate).not.toBe("2026-08-15T00:00:00.000Z");
     expect(card?.dueDate).not.toBe("2026-07-15");
   });
@@ -193,5 +197,76 @@ describe("store business rules", () => {
     expect(updatedLoan?.paidCount).toBe(11);
     expect(updatedLoan?.emiAmount).toBe(2000);
     expect(updatedLoan?.outstanding).toBe(88000);
+  });
+
+  it("moves unbilled to outstanding when marking credit card payment as paid (example: ₹179994.70 due + ₹1086.70 unbilled)", () => {
+    const store = createStore({
+      accounts: [
+        {
+          id: "bank",
+          name: "Bank Account",
+          type: "bank",
+          balance: 200000,
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      creditCards: [
+        {
+          id: "card-1",
+          name: "Visa Card",
+          provider: "Test Bank",
+          creditLimit: 337000,
+          outstanding: 179994.70,
+          unbilled: 1086.70,
+          statementDate: 1,
+          dueDate: "2026-07-10",
+          nextDueDate: "2026-08-10T00:00:00.000Z",
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    // Before payment:
+    // Outstanding = ₹179994.70 (current due)
+    // Unbilled = ₹1086.70 (next due)
+    // Available = 337000 - 179994.70 - 1086.70 = 155918.60
+    const beforeCard = store.creditCards[0];
+    const availableBefore = 337000 - beforeCard.outstanding - (beforeCard.unbilled ?? 0);
+    expect(availableBefore).toBeCloseTo(155918.6);
+
+    // Process payment of full outstanding
+    const updated = processUpcomingDuePayment(store, {
+      entityType: "credit-card",
+      entityId: "card-1",
+      fromAccountId: "bank",
+      amount: 179994.70,
+      date: "2026-07-10",
+    });
+
+    // After payment:
+    // Outstanding should be ₹1086.70 (previous unbilled)
+    // Unbilled should be ₹0.00
+    // Available = 337000 - 1086.70 - 0 = 335913.30
+    const afterCard = updated.creditCards.find((item) => item.id === "card-1");
+    expect(afterCard).toBeDefined();
+    expect(afterCard?.outstanding).toBeCloseTo(1086.70);
+    expect(afterCard?.unbilled).toBe(0);
+
+    const availableAfter = 337000 - (afterCard?.outstanding ?? 0) - (afterCard?.unbilled ?? 0);
+    expect(availableAfter).toBeCloseTo(335913.30);
+
+    // ✅ Bank account balance reduced by payment
+    const updatedBank = updated.accounts.find((a) => a.id === "bank");
+    expect(updatedBank?.balance).toBeCloseTo(20005.30);
+
+    // ✅ Dates advanced
+    expect(afterCard?.dueDate).not.toBe("2026-07-10");
+    expect(afterCard?.nextDueDate).not.toBe("2026-08-10T00:00:00.000Z");
   });
 });

@@ -34,7 +34,7 @@ describe("Mark as Paid: Credit Card Payment Flow", () => {
           provider: "Test Bank",
           creditLimit: 5000,
           outstanding: 500,
-          unbilled: 0,
+          unbilled: 100,
           statementDate: 1,
           dueDate: "2026-07-10",
           nextDueDate: "2026-07-10T00:00:00.000Z",
@@ -72,11 +72,11 @@ describe("Mark as Paid: Credit Card Payment Flow", () => {
     const updatedAccount = updatedStore.accounts.find((a) => a.id === "bank-account");
     expect(updatedAccount?.balance).toBe(4500);
 
-    // ✅ Card outstanding was reduced (via transaction effects)
-    // Note: processUpcomingDuePayment doesn't directly reduce outstanding;
-    // it creates a transaction that createTransaction -> applyTransactionEffects handles.
-    // The card itself needs manual logic in processUpcomingDuePayment.
-    // This test ensures the transaction is created for the UI to process.
+    // ✅ Card outstanding moved from 500 to 100 (previous unbilled)
+    // Card unbilled is now 0
+    const updatedCard = updatedStore.creditCards.find((c) => c.id === "card-1");
+    expect(updatedCard?.outstanding).toBe(100); // Previous unbilled becomes new outstanding
+    expect(updatedCard?.unbilled).toBe(0);
     expect(paymentTx?.ledger).toContain("Visa Card");
   });
 

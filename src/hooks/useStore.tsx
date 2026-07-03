@@ -1276,13 +1276,17 @@ export function processUpcomingDuePayment(
       creditCards: nextStore.creditCards.map((card) => {
         if (card.id !== entityId) return card;
 
+        // Move previous unbilled amount to outstanding (for next billing cycle)
+        const previousUnbilled = card.unbilled ?? 0;
+
         // Advance nextDueDate by one month (preserve day)
         const base = card.nextDueDate ? parseISO(card.nextDueDate) : new Date();
         const newNext = addMonths(base, 1);
 
         return {
           ...card,
-          unbilled: 0,
+          outstanding: previousUnbilled,  // Previous unbilled becomes the new due
+          unbilled: 0,                      // Reset unbilled
           nextDueDate: newNext.toISOString(),
           dueDate: newNext.toISOString().slice(0, 10),
           updatedAt: new Date().toISOString(),
