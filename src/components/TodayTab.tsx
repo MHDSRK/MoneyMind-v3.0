@@ -265,7 +265,7 @@ export function TodayTab() {
         ? (destinationAccount?.name ?? "")
         : undefined;
     const ledgerLabel = isSelfTransfer
-      ? `Self transfer: ₹${parsedAmount} from ${sourceAccount?.name ?? ""} to ${destinationAccount?.name ?? ""}`
+      ? `Self transfer: Rs ${parsedAmount} from ${sourceAccount?.name ?? ""} to ${destinationAccount?.name ?? ""}`
       : ledger.trim();
 
     const nextTransaction: Transaction = {
@@ -450,7 +450,7 @@ export function TodayTab() {
             <div className="flex-1 flex flex-col overflow-hidden px-5">
               <div className="flex-1 overflow-y-auto space-y-3 pt-3 pb-2">
                 <div className="flex items-center gap-1 border-b border-white/10 pb-3">
-                  <span className="text-2xl font-light text-muted-foreground">₹</span>
+                  <span className="text-2xl font-light text-muted-foreground">Rs</span>
                   <input
                     type="number"
                     value={amount}
@@ -474,7 +474,7 @@ export function TodayTab() {
                         <option key={account.id} value={account.id}>{account.name}</option>
                       ))}
                       {visibleCreditCards.map((card) => (
-                        <option key={card.id} value={card.id}>💳 {card.name}</option>
+                        <option key={card.id} value={card.id}>Card: {card.name}</option>
                       ))}
                     </select>
                   </div>
@@ -493,7 +493,7 @@ export function TodayTab() {
                         <option key={account.id} value={account.id}>{account.name}</option>
                       ))}
                       {visibleCreditCards.map((card) => (
-                        <option key={card.id} value={card.id}>💳 {card.name}</option>
+                        <option key={card.id} value={card.id}>Card: {card.name}</option>
                       ))}
                     </select>
                   </div>

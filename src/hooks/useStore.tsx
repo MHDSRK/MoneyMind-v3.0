@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as backupService from "@/lib/backupService";
 import { applyTransactionEffects, createTransaction } from "@/lib/transactionEffects";
-import { addMonths, parseISO } from "date-fns";
+import { addMonths, format, parseISO } from "date-fns";
 
 export type TransactionType = "in" | "out" | "transfer";
 
@@ -1279,16 +1279,17 @@ export function processUpcomingDuePayment(
         // Move previous unbilled amount to outstanding (for next billing cycle)
         const previousUnbilled = card.unbilled ?? 0;
 
-        // Advance nextDueDate by one month (preserve day)
-        const base = card.nextDueDate ? parseISO(card.nextDueDate) : new Date();
-        const newNext = addMonths(base, 1);
+        const dueDateBase = card.dueDate ? parseISO(card.dueDate) : new Date();
+        const nextBillDateBase = card.nextDueDate ? parseISO(card.nextDueDate) : dueDateBase;
+        const newDueDate = addMonths(dueDateBase, 1);
+        const newNextBillDate = addMonths(nextBillDateBase, 1);
 
         return {
           ...card,
           outstanding: previousUnbilled,  // Previous unbilled becomes the new due
           unbilled: 0,                      // Reset unbilled
-          nextDueDate: newNext.toISOString(),
-          dueDate: newNext.toISOString().slice(0, 10),
+          dueDate: format(newDueDate, "yyyy-MM-dd"),
+          nextDueDate: newNextBillDate.toISOString(),
           updatedAt: new Date().toISOString(),
         };
       }),

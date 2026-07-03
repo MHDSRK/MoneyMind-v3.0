@@ -28,3 +28,4 @@ test-output.txt
 vitest-e2e.json
 coverage/
 node_modules
+node_modules

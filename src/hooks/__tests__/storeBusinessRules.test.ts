@@ -6,6 +6,11 @@ import {
   updateLoan,
   Store,
 } from "@/hooks/useStore";
+import {
+  getCreditCardAvailableAmount,
+  getCreditCardDueAmount,
+  getCreditCardOutstandingAmount,
+} from "@/lib/calculations";
 
 describe("store business rules", () => {
   const createStore = (overrides: Partial<Store> = {}): Store => ({
@@ -138,13 +143,13 @@ describe("store business rules", () => {
 
     const card = updated.creditCards.find((item) => item.id === "card-1");
     expect(card).toBeDefined();
-    // ✅ Previous unbilled becomes the new outstanding
+    // Previous unbilled becomes the new outstanding
     expect(card?.outstanding).toBe(200);
-    // ✅ Unbilled is reset to zero
+    // Unbilled is reset to zero
     expect(card?.unbilled).toBe(0);
-    // ✅ Dates are advanced
-    expect(card?.nextDueDate).not.toBe("2026-08-15T00:00:00.000Z");
-    expect(card?.dueDate).not.toBe("2026-07-15");
+    // Dates are advanced by one cycle from their own current values.
+    expect(card?.dueDate).toBe("2026-08-15");
+    expect(card?.nextDueDate.startsWith("2026-09-15")).toBe(true);
   });
 
   it("increments loan paidCount without changing emiAmount on quick-pay", () => {
@@ -199,7 +204,7 @@ describe("store business rules", () => {
     expect(updatedLoan?.outstanding).toBe(88000);
   });
 
-  it("moves unbilled to outstanding when marking credit card payment as paid (example: ₹179994.70 due + ₹1086.70 unbilled)", () => {
+  it("moves unbilled to the next due without merging it with the previous due", () => {
     const store = createStore({
       accounts: [
         {
@@ -232,15 +237,12 @@ describe("store business rules", () => {
       ],
     });
 
-    // Before payment:
-    // Outstanding = ₹179994.70 (current due)
-    // Unbilled = ₹1086.70 (next due)
-    // Available = 337000 - 179994.70 - 1086.70 = 155918.60
     const beforeCard = store.creditCards[0];
-    const availableBefore = 337000 - beforeCard.outstanding - (beforeCard.unbilled ?? 0);
-    expect(availableBefore).toBeCloseTo(155918.6);
+    expect(getCreditCardDueAmount(beforeCard)).toBeCloseTo(179994.70);
+    expect(beforeCard.unbilled).toBeCloseTo(1086.70);
+    expect(getCreditCardOutstandingAmount(beforeCard)).toBeCloseTo(181081.40);
+    expect(getCreditCardAvailableAmount(beforeCard)).toBeCloseTo(155918.60);
 
-    // Process payment of full outstanding
     const updated = processUpcomingDuePayment(store, {
       entityType: "credit-card",
       entityId: "card-1",
@@ -249,24 +251,18 @@ describe("store business rules", () => {
       date: "2026-07-10",
     });
 
-    // After payment:
-    // Outstanding should be ₹1086.70 (previous unbilled)
-    // Unbilled should be ₹0.00
-    // Available = 337000 - 1086.70 - 0 = 335913.30
     const afterCard = updated.creditCards.find((item) => item.id === "card-1");
     expect(afterCard).toBeDefined();
-    expect(afterCard?.outstanding).toBeCloseTo(1086.70);
+    expect(getCreditCardDueAmount(afterCard!)).toBeCloseTo(1086.70);
     expect(afterCard?.unbilled).toBe(0);
+    expect(getCreditCardOutstandingAmount(afterCard!)).toBeCloseTo(1086.70);
+    expect(getCreditCardAvailableAmount(afterCard!)).toBeCloseTo(335913.30);
+    expect(afterCard?.outstanding).not.toBeCloseTo(181081.40);
 
-    const availableAfter = 337000 - (afterCard?.outstanding ?? 0) - (afterCard?.unbilled ?? 0);
-    expect(availableAfter).toBeCloseTo(335913.30);
-
-    // ✅ Bank account balance reduced by payment
     const updatedBank = updated.accounts.find((a) => a.id === "bank");
     expect(updatedBank?.balance).toBeCloseTo(20005.30);
 
-    // ✅ Dates advanced
-    expect(afterCard?.dueDate).not.toBe("2026-07-10");
-    expect(afterCard?.nextDueDate).not.toBe("2026-08-10T00:00:00.000Z");
+    expect(afterCard?.dueDate).toBe("2026-08-10");
+    expect(afterCard?.nextDueDate.startsWith("2026-09-10")).toBe(true);
   });
 });

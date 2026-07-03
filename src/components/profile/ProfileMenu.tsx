@@ -2,7 +2,6 @@ import { useLocation } from "wouter";
 import { X, Archive, History, Pencil } from "lucide-react";
 import { ExportSection } from "./ExportSection";
 import { BackupSection } from "./BackupSection";
-import { GoogleDriveSection } from "./GoogleDriveSection";
 
 export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [, setLocation] = useLocation();
@@ -64,7 +63,6 @@ export function ProfileMenu({ open, onClose }: { open: boolean; onClose: () => v
 
         <ExportSection />
         <BackupSection />
-        <GoogleDriveSection />
       </div>
     </div>
   );

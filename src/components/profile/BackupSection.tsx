@@ -18,39 +18,39 @@ export function BackupSection() {
     try {
       const metadata = backupService.createBackup(store);
       setBackups(backupService.getBackupsMetadata());
-      alert(`✓ Backup created successfully!\n${metadata.size} bytes stored`);
+      alert(`Success: Backup created successfully.\n${metadata.size} bytes stored`);
     } catch (err) {
-      alert(`❌ Backup failed: ${err}`);
+      alert(`Error: Backup failed: ${err}`);
     }
   };
 
   const handleAutoBackupToggle = (enabled: boolean) => {
     backupService.setAutoBackupEnabled(enabled);
     setAutoBackupEnabled(enabled);
-    alert(enabled ? "✓ Auto-backup enabled (daily)" : "⚠️ Auto-backup disabled");
+    alert(enabled ? "Success: Auto-backup enabled (daily)" : "Warning: Auto-backup disabled");
   };
 
   const handleDownloadBackup = (backupId: string, fileName: string) => {
     try {
       backupService.exportBackupAsFile(backupId, fileName);
     } catch (err) {
-      alert(`❌ Download failed: ${err}`);
+      alert(`Error: Download failed: ${err}`);
     }
   };
 
   const handleRestoreBackup = (backupId: string) => {
     const backup = backupService.getBackup(backupId);
     if (!backup) {
-      alert("❌ Backup not found");
+      alert("Error: Backup not found");
       return;
     }
     if (
       window.confirm(
-        "⚠️ This will replace all current data with this backup. Are you sure?"
+        "Warning: This will replace all current data with this backup. Are you sure?"
       )
     ) {
       updateStore(() => backup);
-      alert("✓ Backup restored successfully!");
+      alert("Success: Backup restored successfully.");
     }
   };
 
@@ -58,7 +58,7 @@ export function BackupSection() {
     if (window.confirm("Delete this backup? This cannot be undone.")) {
       backupService.deleteBackup(backupId);
       setBackups(backupService.getBackupsMetadata());
-      alert("✓ Backup deleted");
+      alert("Success: Backup deleted");
     }
   };
 
@@ -75,14 +75,14 @@ export function BackupSection() {
           const backup = JSON.parse(event.target?.result as string);
           if (
             window.confirm(
-              "⚠️ This will replace all current data with the uploaded backup. Are you sure?"
+              "Warning: This will replace all current data with the uploaded backup. Are you sure?"
             )
           ) {
             updateStore(() => backup);
-            alert("✓ Data restored successfully!");
+            alert("Success: Data restored successfully.");
           }
         } catch (err) {
-          alert("❌ Invalid backup file");
+          alert("Error: Invalid backup file");
           console.error(err);
         }
       };
@@ -113,7 +113,6 @@ export function BackupSection() {
 
       {open && (
         <div className="py-2 space-y-0.5 pl-7">
-          {/* Auto-backup toggle */}
           <div className="py-3 px-3 rounded-xl bg-white/5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-foreground">Auto-backup (Daily)</span>
@@ -136,7 +135,6 @@ export function BackupSection() {
             )}
           </div>
 
-          {/* Manual backup */}
           <button
             type="button"
             onClick={handleCreateBackup}
@@ -146,7 +144,6 @@ export function BackupSection() {
             <Download className="w-3.5 h-3.5 text-primary opacity-60" />
           </button>
 
-          {/* Backups list toggle */}
           <button
             type="button"
             onClick={() => setBackupsListOpen((o) => !o)}
@@ -204,7 +201,6 @@ export function BackupSection() {
             </div>
           )}
 
-          {/* Import from file */}
           <button
             type="button"
             onClick={handleRestoreFromFile}

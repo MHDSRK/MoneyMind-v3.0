@@ -243,6 +243,10 @@ export function getCreditCardAvailableAmount(card: { creditLimit: number; outsta
 }
 
 export function getCreditCardDueAmount(card: { outstanding: number; unbilled?: number }): number {
+  return card.outstanding;
+}
+
+export function getCreditCardOutstandingAmount(card: { outstanding: number; unbilled?: number }): number {
   return card.outstanding + (card.unbilled ?? 0);
 }
 
@@ -325,16 +329,18 @@ export function calculateMetrics(store: Store): FinancialMetrics {
   // ─────────────────────────────────────────────────────────────────────────────
   // Credit Card Metrics
   // ─────────────────────────────────────────────────────────────────────────────
-  const creditCardOutstanding = activeCreditCards.reduce((sum, c) => sum + c.outstanding, 0);
-
   const creditCardUnbilled = activeCreditCards.reduce((sum, card) => sum + (card.unbilled ?? 0), 0);
+
+  const creditCardOutstanding = activeCreditCards.reduce(
+    (sum, card) => sum + getCreditCardOutstandingAmount(card),
+    0
+  );
 
   const creditCardTotalLimit = activeCreditCards.reduce((sum, c) => sum + c.creditLimit, 0);
 
   const creditCardAvailableLimit =
     creditCardTotalLimit -
-    creditCardOutstanding -
-    creditCardUnbilled;
+    creditCardOutstanding;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Loan Metrics
@@ -435,7 +441,7 @@ export function getAccountBalance(store: Store, accountId: string): number {
 export function getCreditCardAvailable(store: Store, cardId: string): number {
   const card = store.creditCards.find((c) => c.id === cardId && !c.deleted && !c.archivedAt);
   if (!card) return 0;
-  return card.creditLimit - card.outstanding;
+  return getCreditCardAvailableAmount(card);
 }
 
 /**

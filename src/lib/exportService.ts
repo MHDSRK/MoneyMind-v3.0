@@ -57,7 +57,6 @@ export function buildAndDownload(
 ): void {
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: Transactions
   const txRows = transactions.map((tx) => ({
     Date: format(new Date(tx.date), "dd/MM/yyyy"),
     Type:
@@ -74,43 +73,40 @@ export function buildAndDownload(
     "To Account ID": tx.toAccountId || "",
     "To Account Status": getAccountStatus(accounts, tx.toAccountId),
     "To Account": tx.toAccount || "",
-    "Amount (₹)": tx.amount,
+    "Amount (Rs)": tx.amount,
     Notes: tx.notes || "",
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows), "Transactions");
 
-  // Sheet 2: Accounts
   const acctRows = accounts
     .filter((a) => !a.deleted && !a.archivedAt)
     .map((a) => ({
       Name: a.name,
       Type: a.type,
-      "Balance (₹)": a.balance,
+      "Balance (Rs)": a.balance,
     }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(acctRows), "Accounts");
 
-  // Sheet 3: Credit Cards
   const ccRows = creditCards
     .filter((c) => !c.deleted && !c.archivedAt)
     .map((c) => ({
       Name: c.name,
       Provider: c.provider,
-      "Credit Limit (₹)": c.creditLimit,
-      "Outstanding (₹)": c.outstanding,
-      "Available (₹)": c.creditLimit - c.outstanding - (c.unbilled ?? 0),
+      "Credit Limit (Rs)": c.creditLimit,
+      "Outstanding (Rs)": c.outstanding,
+      "Available (Rs)": c.creditLimit - c.outstanding - (c.unbilled ?? 0),
     }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ccRows), "Credit Cards");
 
-  // Sheet 4: Loans
   const loanRows = loans
     .filter((l) => !l.deleted && !l.archivedAt)
     .map((l) => ({
       Name: l.name,
       Lender: l.lender,
-      "Principal (₹)": l.principal,
+      "Principal (Rs)": l.principal,
       "Interest Rate (%)": l.interestRate,
-      "EMI (₹)": l.emiAmount,
-      "Outstanding (₹)": l.outstanding,
+      "EMI (Rs)": l.emiAmount,
+      "Outstanding (Rs)": l.outstanding,
     }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(loanRows), "Loans");
 
