@@ -71,7 +71,7 @@ describe("TodayTab", () => {
     expect(editButton).toBeNull();
     expect(deleteButton).toBeNull();
     expect(container.textContent).toContain("Monthly Salary Payment");
-    expect(container.textContent).toContain("Bank Account");
+    expect(container.textContent).toContain("Salary receipt");
 
     act(() => {
       root.unmount();

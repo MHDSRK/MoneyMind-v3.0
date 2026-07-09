@@ -12,7 +12,7 @@ import {
   isCategoryAvailableForTransactionType,
 } from "@/hooks/useStore";
 import { createTransaction } from "@/lib/transactionEffects";
-import { isLentAccount, isTrackingTransaction } from "@/lib/calculations";
+import { isLentAccount, isPaymentAccount, isTrackingTransaction } from "@/lib/calculations";
 import { toast } from "@/hooks/use-toast";
 import { formatAppDate } from "@/utils/date";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -68,7 +68,7 @@ export function TodayTab() {
   const todayOut = todaysTx.filter((t) => t.type === "out").reduce((sum, t) => sum + t.amount, 0);
   const todayNet = todayIn - todayOut;
 
-  const visibleAccounts = store.accounts.filter((account) => !account.deleted && !account.archivedAt);
+  const visibleAccounts = store.accounts.filter(isPaymentAccount);
   const visibleCreditCards = store.creditCards.filter((card) => !card.deleted && !card.archivedAt);
 
   // Build category lists from the shared registry (store.categories).

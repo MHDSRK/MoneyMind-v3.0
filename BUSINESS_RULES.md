@@ -84,7 +84,7 @@ available balance, dashboard summaries, or reports."*). Lent accounts are exclud
 
 **Affected files:** `calculations.ts`, `AssetsTab.tsx`, `HomeTab.tsx`
 
-**Regression test:** `src/lib/__tests__/calculations.lent.test.ts`
+**Regression test:** `src/lib/__tests__/calculations.lent.test.ts` and `src/components/__tests__/EditPage.test.tsx` (the latter verifies the isolated totals text no longer includes Lent balances in the relevant totals section).
 
 ### LENT-002 (BR-004) — Lent Effects on Transactions
 **Status:** ✅ Verified (function exists, exact math not re-derived)

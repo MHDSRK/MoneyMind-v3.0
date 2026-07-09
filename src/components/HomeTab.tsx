@@ -10,7 +10,7 @@ import {
   processUpcomingDuePayment,
   isCategoryAvailableForTransactionType,
 } from "@/hooks/useStore";
-import { calculateMetrics, getUpcomingDues, isLentAccount } from "@/lib/calculations";
+import { calculateMetrics, getUpcomingDues, isLentAccount, isPaymentAccount } from "@/lib/calculations";
 import { createTransaction } from "@/lib/transactionEffects";
 import { Plus, ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, X, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -54,7 +54,7 @@ export function HomeTab() {
   const [payFromAccountId, setPayFromAccountId] = useState<string>("");
   const [openRowId, setOpenRowId] = useState<string | null>(null);
 
-  const visibleAccounts = store.accounts.filter((a) => !a.deleted && !a.archivedAt);
+  const visiblePaymentAccounts = store.accounts.filter(isPaymentAccount);
   const visibleCreditCards = store.creditCards.filter((c) => !c.deleted && !c.archivedAt);
 
   /* Build typed option arrays from the project's default category lists. */
@@ -95,7 +95,7 @@ export function HomeTab() {
       <option value="" disabled>
         Select Account or Card
       </option>
-      {visibleAccounts.map((a) => (
+      {visiblePaymentAccounts.map((a) => (
         <option key={a.id} value={a.id}>
           {a.name}
         </option>
@@ -117,7 +117,7 @@ export function HomeTab() {
       <option value="" disabled>
         Select Account or Card
       </option>
-      {visibleAccounts.map((a) => (
+      {visiblePaymentAccounts.map((a) => (
         <option key={a.id} value={a.id}>
           {a.name}
         </option>
@@ -209,12 +209,12 @@ export function HomeTab() {
         return;
       }
     }
-    const selectedFromAccountId = visibleAccounts.find((account) => account.id === fromAccountId)?.id;
-    const selectedToAccountId = visibleAccounts.find((account) => account.id === toAccountId)?.id;
+    const selectedFromAccountId = visiblePaymentAccounts.find((account) => account.id === fromAccountId)?.id;
+    const selectedToAccountId = visiblePaymentAccounts.find((account) => account.id === toAccountId)?.id;
     const selectedFromCardId = visibleCreditCards.find((card) => card.id === fromAccountId)?.id;
     const selectedToCardId = visibleCreditCards.find((card) => card.id === toAccountId)?.id;
-    const sourceAccount = visibleAccounts.find((account) => account.id === selectedFromAccountId);
-    const destinationAccount = visibleAccounts.find((account) => account.id === selectedToAccountId);
+    const sourceAccount = visiblePaymentAccounts.find((account) => account.id === selectedFromAccountId);
+    const destinationAccount = visiblePaymentAccounts.find((account) => account.id === selectedToAccountId);
     const sourceCard = visibleCreditCards.find((card) => card.id === selectedFromCardId);
     const sourceName = txType === "out"
       ? (sourceAccount?.name ?? sourceCard?.name ?? "")
@@ -588,7 +588,7 @@ export function HomeTab() {
                         className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
                       >
                         <option value="" disabled>Select Source Account</option>
-                        {visibleAccounts.map((a) => (
+                        {visiblePaymentAccounts.map((a) => (
                           <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
                       </select>
@@ -603,7 +603,7 @@ export function HomeTab() {
                         className="w-full bg-black/20 border border-white/10 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary transition-all text-foreground text-sm"
                       >
                         <option value="" disabled>Select Destination Account</option>
-                        {visibleAccounts.map((a) => (
+                        {visiblePaymentAccounts.map((a) => (
                           <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
                       </select>

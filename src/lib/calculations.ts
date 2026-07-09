@@ -61,6 +61,12 @@ export function isLentAccount(account: { name?: string; isTracking?: boolean }):
   return isTrackingAccount(account);
 }
 
+export function isPaymentAccount(account: { deleted?: boolean; archivedAt?: string; type?: string; name?: string; isTracking?: boolean }): boolean {
+  if (account.deleted || account.archivedAt) return false;
+  if (isLentAccount(account)) return false;
+  return account.type === "cash" || account.type === "bank";
+}
+
 export function isFinancialAccount(account: { deleted?: boolean; archivedAt?: string; name?: string; type?: string }): boolean {
   return !account.deleted && !account.archivedAt && !isTrackingAccount(account);
 }
@@ -133,9 +139,12 @@ export function getUpcomingDues(
 
   dues.push(
     ...store.creditCards
-      .filter((card) => !card.deleted && !card.archivedAt && card.outstanding > 0)
+      .filter((card) => !card.deleted && !card.archivedAt)
       .map<UpcomingDueItem | null>((card) => {
-        const dueDate = parseDueDate(card.nextDueDate);
+        const dueAmount = getCreditCardDueAmount(card);
+        if (dueAmount <= 0) return null;
+
+        const dueDate = parseDueDate(card.dueDate);
         if (!dueDate) return null;
 
         const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
@@ -146,8 +155,8 @@ export function getUpcomingDues(
           entityId: card.id,
           entityType: "credit-card",
           name: card.name,
-          dueAmount: card.outstanding,
-          nextDueDate: card.nextDueDate,
+          dueAmount,
+          nextDueDate: card.dueDate,
           daysLeft,
         };
       })

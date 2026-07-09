@@ -45,6 +45,47 @@ describe("transactionEffects card timestamps", () => {
     expect(updated.transactions).toHaveLength(1);
   });
 
+  it("reverses card unbilled changes when a card transaction is deleted", () => {
+    const store = createStore({
+      creditCards: [
+        {
+          id: "card-1",
+          name: "Main Card",
+          provider: "Bank",
+          creditLimit: 100000,
+          outstanding: 1000,
+          unbilled: 100,
+          statementDate: 31,
+          dueDate: "2026-06-15",
+          nextDueDate: "2026-06-30",
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const created = createTransaction(store, {
+      id: "tx-1",
+      type: "out",
+      amount: 200,
+      ledger: "Groceries",
+      category: "Unbilled",
+      fromCardId: "card-1",
+      date: "2026-06-15",
+      tags: ["unbilled"],
+    });
+
+    const cardAfterCreate = created.creditCards.find((item) => item.id === "card-1");
+    expect(cardAfterCreate?.unbilled).toBe(300);
+
+    const deleted = deleteTransactionFromStore(created, created.transactions[0]);
+    const cardAfterDelete = deleted.creditCards.find((item) => item.id === "card-1");
+    expect(cardAfterDelete?.unbilled).toBe(100);
+    expect(deleted.transactions).toHaveLength(0);
+  });
+
   it("deletes and restores a transaction while adjusting balances", () => {
     const store = createStore({
       accounts: [

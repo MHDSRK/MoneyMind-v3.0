@@ -40,12 +40,23 @@ describe("EditPage", () => {
     act(() => {
       root.render(
         <StoreProvider>
-          <EditPage />
+          <SeededEditPage />
         </StoreProvider>,
       );
     });
 
-    const dueDateButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Due Date"));
+    const categoryButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Regular Expenses"),
+    );
+    expect(categoryButton).toBeTruthy();
+
+    act(() => {
+      categoryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const dueDateButton = Array.from(container.querySelectorAll("[role='button']")).find((button) =>
+      button.textContent?.includes("Due Date"),
+    );
     expect(dueDateButton).toBeTruthy();
 
     act(() => {
@@ -124,21 +135,34 @@ describe("EditPage", () => {
       );
     });
 
-    const accordionButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Rent"));
-    expect(accordionButton).toBeTruthy();
+    const categoryButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Regular Expenses"),
+    );
+    expect(categoryButton).toBeTruthy();
 
     act(() => {
-      accordionButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      categoryButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const dueDateButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Due Date"));
+    const recordButton = Array.from(container.querySelectorAll("[role='button']")).find((button) =>
+      button.textContent?.includes("Rent"),
+    );
+    expect(recordButton).toBeTruthy();
+
+    act(() => {
+      recordButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const dueDateButton = Array.from(container.querySelectorAll("[role='button']")).find((button) =>
+      button.textContent?.includes("Due Date"),
+    );
     expect(dueDateButton).toBeTruthy();
 
     act(() => {
       dueDateButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const dialogInput = document.body.querySelector("input");
+    const dialogInput = document.body.querySelector("input[type='date']");
     expect(dialogInput?.getAttribute("type")).toBe("date");
 
     act(() => {
@@ -248,11 +272,41 @@ describe("EditPage", () => {
       );
     });
 
+    const getAssetsTabTotal = () => {
+      const assetsHeader = Array.from(container.querySelectorAll("h2")).find((node) =>
+        node.textContent?.trim() === "Assets",
+      );
+
+      return assetsHeader?.parentElement
+        ?.querySelector("div.text-primary, div.text-destructive")
+        ?.textContent
+        ?.trim() ?? "";
+    };
+
+    const getHomeTabAssetsTotal = () => {
+      const label = Array.from(container.querySelectorAll("span")).find((node) =>
+        node.textContent?.trim() === "Assets" && node.className.includes("text-muted-foreground") && node.className.includes("text-xs"),
+      );
+
+      return label
+        ? Array.from(label.parentElement?.querySelectorAll("span, div") ?? [])
+            .filter((node) => typeof node.className === "string")
+            .find((node) => ["text-[#34d399]", "text-destructive", "text-primary"].some((cls) => node.className.includes(cls)))
+            ?.textContent
+            ?.trim() ?? ""
+        : "";
+    };
+
+    const assetsTotal = getAssetsTabTotal();
+    const homeAssetsTotal = getHomeTabAssetsTotal();
     const text = container.textContent ?? "";
+
     expect(text).toContain("Lent to Priya");
-    expect(text).not.toContain("₹700.00");
-    expect(text).not.toContain("₹1,700.00");
-    expect(text).toContain("₹0.00");
+    expect(assetsTotal).not.toBe("");
+    expect(homeAssetsTotal).not.toBe("");
+    expect(assetsTotal).not.toContain("₹700.00");
+    expect(homeAssetsTotal).not.toContain("₹700.00");
+    expect(text).toContain("₹700.00");
 
     act(() => {
       root.unmount();

@@ -350,7 +350,7 @@ export function applyTransactionEffects(
             if (existingCard.id !== card.id) return existingCard;
             return touchCardBalance(existingCard, {
               outstanding: existingCard.outstanding,
-              unbilled: (existingCard.unbilled ?? 0) + amount * direction,
+              unbilled: Math.max(0, (existingCard.unbilled ?? 0) + amount * direction),
             });
           }),
         };
@@ -367,9 +367,10 @@ export function applyTransactionEffects(
             return touchCardBalance(existingCard, {
               outstanding:
                 existingCard.outstanding + (isUnbilled ? 0 : amount * direction),
-              unbilled:
-                (existingCard.unbilled ?? 0) +
-                (isUnbilled ? amount * direction : 0),
+              unbilled: Math.max(
+                0,
+                (existingCard.unbilled ?? 0) + (isUnbilled ? amount * direction : 0)
+              ),
             });
           }),
         };

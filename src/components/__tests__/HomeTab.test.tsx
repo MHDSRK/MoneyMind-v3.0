@@ -10,6 +10,9 @@ function SeededHomeTab() {
   const { updateStore } = useStore();
 
   useEffect(() => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const nextDueDate = tomorrow.toISOString().split("T")[0];
+
     updateStore((prev) => ({
       ...prev,
       creditCards: [
@@ -22,8 +25,8 @@ function SeededHomeTab() {
           outstanding: 200,
           unbilled: 0,
           statementDate: 1,
-          dueDate: "2026-07-04",
-          nextDueDate: "2026-07-04T00:00:00.000Z",
+          dueDate: nextDueDate,
+          nextDueDate,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -67,6 +70,32 @@ describe("HomeTab swipe interaction", () => {
     expect(actionContainer).toBeTruthy();
     expect(window.getComputedStyle(actionContainer!).opacity).toBe("0");
     expect(window.getComputedStyle(actionContainer!).pointerEvents).toBe("none");
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("renders credit card dues in the upcoming dues section", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <StoreProvider>
+          <SeededHomeTab />
+        </StoreProvider>,
+      );
+    });
+
+    const dueSection = Array.from(container.querySelectorAll("div.glass-card")).find((section) =>
+      section.textContent?.includes("Upcoming Dues"),
+    );
+    expect(dueSection).toBeTruthy();
+    expect(dueSection?.textContent).toContain("Test Card");
+    expect(dueSection?.textContent).toContain("₹");
 
     act(() => {
       root.unmount();

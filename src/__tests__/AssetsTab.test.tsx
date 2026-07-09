@@ -55,6 +55,13 @@ describe("AssetsTab", () => {
       );
     });
 
+    act(() => {
+      const button = Array.from(container.querySelectorAll("button")).find((node) =>
+        node.textContent?.includes("Bank & Cash"),
+      );
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
     const text = container.textContent ?? "";
 
     expect(text).toContain("Assets");

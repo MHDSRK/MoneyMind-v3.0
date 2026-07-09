@@ -316,8 +316,8 @@ describe("Financial Calculations", () => {
             outstanding: 1200,
             unbilled: 0,
             statementDate: 1,
-            dueDate: "2026-02-15",
-            nextDueDate: "2026-02-04T00:00:00.000Z",
+            dueDate: "2026-02-04",
+            nextDueDate: "2026-02-20T00:00:00.000Z",
             deleted: false,
           },
           {
@@ -359,6 +359,40 @@ describe("Financial Calculations", () => {
       expect(dues[0].daysLeft).toBe(3);
     });
 
+    it("uses the card due date and due amount instead of next bill date or unbilled balance", () => {
+      const store = createStore({
+        creditCards: [
+          {
+            id: "cc1",
+            name: "Card A",
+            provider: "Bank",
+            cardType: "Credit",
+            creditLimit: 10000,
+            outstanding: 1200,
+            unbilled: 9000,
+            statementDate: 1,
+            dueDate: "2026-02-04",
+            nextDueDate: "2026-02-20",
+            deleted: false,
+          },
+        ],
+      });
+
+      const dues = getUpcomingDues(store, {
+        referenceDate: new Date("2026-02-01T00:00:00.000Z"),
+        daysAhead: 5,
+      });
+
+      expect(dues).toHaveLength(1);
+      expect(dues[0]).toMatchObject({
+        entityType: "credit-card",
+        name: "Card A",
+        dueAmount: 1200,
+        nextDueDate: "2026-02-04",
+        daysLeft: 3,
+      });
+    });
+
     it("returns all supported upcoming due items ordered by nearest due date", () => {
       const store = createStore({
         creditCards: [
@@ -371,8 +405,8 @@ describe("Financial Calculations", () => {
             outstanding: 1200,
             unbilled: 0,
             statementDate: 1,
-            dueDate: "2026-02-15",
-            nextDueDate: "2026-02-03T00:00:00.000Z",
+            dueDate: "2026-02-03",
+            nextDueDate: "2026-02-20T00:00:00.000Z",
             deleted: false,
           },
         ],

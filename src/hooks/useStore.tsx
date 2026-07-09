@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import * as backupService from "@/lib/backupService";
 import { applyTransactionEffects, createTransaction } from "@/lib/transactionEffects";
 import { addMonths, format, parseISO } from "date-fns";
@@ -718,10 +718,22 @@ function applyTransactionEffectsToStore(store: Store, transaction: Transaction, 
     }
 
     if (card) {
+      const isUnbilledQuickAdd =
+        normalizedTransaction.category === "Unbilled" ||
+        normalizedTransaction.tags.includes("unbilled");
+
       nextStore = {
         ...nextStore,
         creditCards: nextStore.creditCards.map((existingCard) => {
           if (existingCard.id !== card.id) return existingCard;
+
+          if (isUnbilledQuickAdd) {
+            return touchCardBalance(existingCard, {
+              outstanding: existingCard.outstanding,
+              unbilled: Math.max(0, (existingCard.unbilled ?? 0) + amount * direction),
+            });
+          }
+
           const today = new Date();
           const currentDate = today.getDate();
           const statementDate = existingCard.statementDate || 1;
@@ -729,7 +741,7 @@ function applyTransactionEffectsToStore(store: Store, transaction: Transaction, 
 
           return touchCardBalance(existingCard, {
             outstanding: existingCard.outstanding + (isUnbilled ? 0 : amount * direction),
-            unbilled: (existingCard.unbilled ?? 0) + (isUnbilled ? amount * direction : 0),
+            unbilled: Math.max(0, (existingCard.unbilled ?? 0) + (isUnbilled ? amount * direction : 0)),
           });
         }),
       };
@@ -1391,7 +1403,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [store]);
 
-  const updateStore = (updater: (prev: Store) => Store) => {
+  const updateStore = useCallback((updater: (prev: Store) => Store) => {
     setStore((prev) => {
       const next = normalizeStore(updater(prev));
       const frozen = freezeArchivedRecords(prev, next);
@@ -1406,7 +1418,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         history: [...events, ...(frozen.history ?? [])].slice(0, 300),
       };
     });
-  };
+  }, []);
 
   return (
     <StoreContext.Provider value={{ store, updateStore }}>
