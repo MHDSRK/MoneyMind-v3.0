@@ -72,11 +72,10 @@ describe("Mark as Paid: Credit Card Payment Flow", () => {
     const updatedAccount = updatedStore.accounts.find((a) => a.id === "bank-account");
     expect(updatedAccount?.balance).toBe(4500);
 
-    // ✅ Card outstanding moved from 500 to 100 (previous unbilled)
-    // Card unbilled is now 0
+    // ✅ Current due is cleared by the payment; unbilled remains intact.
     const updatedCard = updatedStore.creditCards.find((c) => c.id === "card-1");
-    expect(updatedCard?.outstanding).toBe(100); // Previous unbilled becomes new outstanding
-    expect(updatedCard?.unbilled).toBe(0);
+    expect(updatedCard?.outstanding).toBe(0);
+    expect(updatedCard?.unbilled).toBe(100);
     expect(paymentTx?.ledger).toContain("Visa Card");
   });
 
