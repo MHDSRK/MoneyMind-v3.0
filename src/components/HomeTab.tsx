@@ -389,6 +389,8 @@ export function HomeTab() {
                           ? "Due today"
                           : due.daysLeft === 1
                           ? "Tomorrow"
+                          : due.daysLeft < 0
+                          ? `Overdue by ${Math.abs(due.daysLeft)} days`
                           : `In ${due.daysLeft} days`}
                         {" · "}
                         {formatAppDate(due.nextDueDate)}

@@ -802,6 +802,58 @@ export function restoreTransactionFromStore(store: Store, transaction: Transacti
   });
 }
 
+export function advanceCreditCardBillingCycles(store: Store, referenceDate: Date = new Date()): Store {
+  const today = new Date(referenceDate);
+  today.setHours(0, 0, 0, 0);
+  const todayKey = format(today, "yyyy-MM-dd");
+
+  const parseDateOnly = (value?: string): string | null => {
+    if (!value) return null;
+    const dateOnly = value.split("T")[0];
+    const parsed = new Date(dateOnly);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return format(parsed, "yyyy-MM-dd");
+  };
+
+  let changed = false;
+  const creditCards = store.creditCards.map((card) => {
+    if (card.deleted || card.archivedAt) return card;
+    const nextBillKey = parseDateOnly(card.nextDueDate);
+    if (!nextBillKey || nextBillKey > todayKey) return card;
+
+    let updatedCard: CreditCard = { ...card };
+    let currentDueDate = parseISO(card.dueDate || todayKey);
+    if (Number.isNaN(currentDueDate.getTime())) {
+      currentDueDate = parseISO(todayKey);
+    }
+    let cycleDate = parseISO(nextBillKey);
+
+    while (cycleDate <= today) {
+      const unbilledAmount = Math.max(0, updatedCard.unbilled ?? 0);
+      const nextCycleDate = addMonths(cycleDate, 1);
+      updatedCard = {
+        ...updatedCard,
+        outstanding: Math.max(0, updatedCard.outstanding + unbilledAmount),
+        unbilled: 0,
+        dueDate: format(addMonths(currentDueDate, 1), "yyyy-MM-dd"),
+        nextDueDate: `${format(nextCycleDate, "yyyy-MM-dd")}T00:00:00.000Z`,
+        updatedAt: new Date().toISOString(),
+      };
+      currentDueDate = parseISO(updatedCard.dueDate);
+      cycleDate = addMonths(cycleDate, 1);
+    }
+
+    changed = true;
+    return updatedCard;
+  });
+
+  if (!changed) return store;
+  return {
+    ...store,
+    creditCards,
+  };
+}
+
 export function updateTransactionInStore(
   store: Store,
   previousTransaction: Transaction,
@@ -1288,20 +1340,13 @@ export function processUpcomingDuePayment(
       creditCards: nextStore.creditCards.map((card) => {
         if (card.id !== entityId) return card;
 
-        // Move previous unbilled amount to outstanding (for next billing cycle)
-        const previousUnbilled = card.unbilled ?? 0;
-
-        const dueDateBase = card.dueDate ? parseISO(card.dueDate) : new Date();
-        const nextBillDateBase = card.nextDueDate ? parseISO(card.nextDueDate) : dueDateBase;
-        const newDueDate = addMonths(dueDateBase, 1);
-        const newNextBillDate = addMonths(nextBillDateBase, 1);
-
+        // Marking the current statement as paid clears only the current due amount.
+        // Unbilled transactions remain unchanged and the next billing cycle is
+        // advanced only when the card's Next Bill Date is reached.
         return {
           ...card,
-          outstanding: previousUnbilled,  // Previous unbilled becomes the new due
-          unbilled: 0,                      // Reset unbilled
-          dueDate: format(newDueDate, "yyyy-MM-dd"),
-          nextDueDate: newNextBillDate.toISOString(),
+          outstanding: Math.max(0, card.outstanding - amount),
+          unbilled: card.unbilled ?? 0,
           updatedAt: new Date().toISOString(),
         };
       }),
@@ -1419,6 +1464,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       };
     });
   }, []);
+
+  useEffect(() => {
+    const nextStore = advanceCreditCardBillingCycles(store);
+    if (nextStore !== store) {
+      updateStore(() => nextStore);
+    }
+  }, [store, updateStore]);
 
   return (
     <StoreContext.Provider value={{ store, updateStore }}>

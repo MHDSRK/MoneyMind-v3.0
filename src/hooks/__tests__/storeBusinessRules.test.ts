@@ -4,6 +4,7 @@ import {
   updateCreditCard,
   processUpcomingDuePayment,
   updateLoan,
+  advanceCreditCardBillingCycles,
   Store,
 } from "@/hooks/useStore";
 import {
@@ -100,7 +101,7 @@ describe("store business rules", () => {
     expect(tx?.ledger).toContain("Main Card");
   });
 
-  it("resets credit card unbilled to zero and advances due dates on quick-pay", () => {
+  it("preserves credit card unbilled and keeps billing dates on quick-pay", () => {
     const store = createStore({
       accounts: [
         {
@@ -143,13 +144,10 @@ describe("store business rules", () => {
 
     const card = updated.creditCards.find((item) => item.id === "card-1");
     expect(card).toBeDefined();
-    // Previous unbilled becomes the new outstanding
-    expect(card?.outstanding).toBe(200);
-    // Unbilled is reset to zero
-    expect(card?.unbilled).toBe(0);
-    // Dates are advanced by one cycle from their own current values.
-    expect(card?.dueDate).toBe("2026-08-15");
-    expect(card?.nextDueDate.startsWith("2026-09-15")).toBe(true);
+    expect(card?.outstanding).toBe(500);
+    expect(card?.unbilled).toBe(200);
+    expect(card?.dueDate).toBe("2026-07-15");
+    expect(card?.nextDueDate).toBe("2026-08-15T00:00:00.000Z");
   });
 
   it("increments loan paidCount without changing emiAmount on quick-pay", () => {
@@ -204,7 +202,7 @@ describe("store business rules", () => {
     expect(updatedLoan?.outstanding).toBe(88000);
   });
 
-  it("moves unbilled to the next due without merging it with the previous due", () => {
+  it("does not move unbilled to the current due on quick-pay", () => {
     const store = createStore({
       accounts: [
         {
@@ -241,7 +239,6 @@ describe("store business rules", () => {
     expect(getCreditCardDueAmount(beforeCard)).toBeCloseTo(179994.70);
     expect(beforeCard.unbilled).toBeCloseTo(1086.70);
     expect(getCreditCardOutstandingAmount(beforeCard)).toBeCloseTo(181081.40);
-    expect(getCreditCardAvailableAmount(beforeCard)).toBeCloseTo(155918.60);
 
     const updated = processUpcomingDuePayment(store, {
       entityType: "credit-card",
@@ -253,16 +250,45 @@ describe("store business rules", () => {
 
     const afterCard = updated.creditCards.find((item) => item.id === "card-1");
     expect(afterCard).toBeDefined();
-    expect(getCreditCardDueAmount(afterCard!)).toBeCloseTo(1086.70);
-    expect(afterCard?.unbilled).toBe(0);
+    expect(getCreditCardDueAmount(afterCard!)).toBeCloseTo(0);
+    expect(afterCard?.unbilled).toBeCloseTo(1086.70);
     expect(getCreditCardOutstandingAmount(afterCard!)).toBeCloseTo(1086.70);
-    expect(getCreditCardAvailableAmount(afterCard!)).toBeCloseTo(335913.30);
-    expect(afterCard?.outstanding).not.toBeCloseTo(181081.40);
+    expect(afterCard?.outstanding).toBeCloseTo(0);
+    expect(afterCard?.dueDate).toBe("2026-07-10");
+    expect(afterCard?.nextDueDate).toBe("2026-08-10T00:00:00.000Z");
 
     const updatedBank = updated.accounts.find((a) => a.id === "bank");
     expect(updatedBank?.balance).toBeCloseTo(20005.30);
+  });
 
-    expect(afterCard?.dueDate).toBe("2026-08-10");
-    expect(afterCard?.nextDueDate.startsWith("2026-09-10")).toBe(true);
+  it("advances credit card billing cycles on next bill date and promotes unbilled to due", () => {
+    const store = createStore({
+      creditCards: [
+        {
+          id: "card-1",
+          name: "Visa Card",
+          provider: "Test Bank",
+          creditLimit: 337000,
+          outstanding: 179994.70,
+          unbilled: 1086.70,
+          statementDate: 1,
+          dueDate: "2026-07-10",
+          nextDueDate: "2026-08-10T00:00:00.000Z",
+          deleted: false,
+          archivedAt: undefined,
+          createdAt: "2026-07-01T00:00:00.000Z",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const updated = advanceCreditCardBillingCycles(store, new Date("2026-08-10"));
+    const card = updated.creditCards.find((item) => item.id === "card-1");
+
+    expect(card).toBeDefined();
+    expect(card?.outstanding).toBeCloseTo(181081.40);
+    expect(card?.unbilled).toBe(0);
+    expect(card?.dueDate).toBe("2026-08-10");
+    expect(card?.nextDueDate.startsWith("2026-09-10")).toBe(true);
   });
 });

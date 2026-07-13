@@ -148,7 +148,7 @@ export function getUpcomingDues(
         if (!dueDate) return null;
 
         const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
-        if (daysLeft < 0 || daysLeft > daysAhead) return null;
+        if (daysLeft > daysAhead) return null;
 
         return {
           id: `credit-card-${card.id}`,
@@ -171,7 +171,7 @@ export function getUpcomingDues(
         if (!dueDate) return null;
 
         const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
-        if (daysLeft < 0 || daysLeft > daysAhead) return null;
+        if (daysLeft > daysAhead) return null;
 
         return {
           id: `loan-${loan.id}`,
@@ -194,7 +194,7 @@ export function getUpcomingDues(
         if (!dueDate) return null;
 
         const daysLeft = differenceInCalendarDays(dueDate, referenceDate);
-        if (daysLeft < 0 || daysLeft > daysAhead) return null;
+        if (daysLeft > daysAhead) return null;
 
         return {
           id: `liability-${item.id}`,
